@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Package, MapPin, Users, Search, Download, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import TreeView from '@/components/TreeView'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -188,6 +189,19 @@ export default function Dashboard() {
             </div>
             <MapPin className="h-8 w-8 text-muted-foreground" />
           </div>
+        </div>
+      </div>
+
+      <div className="bg-card border rounded-lg p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-xl font-semibold">Location Hierarchy</h2>
+        </div>
+        <div className="max-h-96 overflow-y-auto">
+          <TreeView
+            locations={locations}
+            onLocationClick={(location) => setSelectedLocation(location.id)}
+          />
         </div>
       </div>
 
