@@ -187,12 +187,22 @@ export default function ItemDetail() {
     if (!item || item.is_unique) return
 
     const newQuantity = Math.max(0, item.quantity + delta)
+
+    // Optimistically update local state
+    setItem(prevItem => ({
+      ...prevItem,
+      quantity: newQuantity
+    }))
+
+    // Then update database
     const { error } = await supabase
       .from('items')
       .update({ quantity: newQuantity })
       .eq('id', itemId)
 
-    if (!error) {
+    if (error) {
+      // Revert on error
+      console.error('Error updating quantity:', error)
       fetchItemData()
     }
   }
@@ -216,14 +226,23 @@ export default function ItemDetail() {
       return
     }
 
+    // Optimistically update local state
+    setItem(prevItem => ({
+      ...prevItem,
+      quantity: newQuantity
+    }))
+    setEditingQuantity(false)
+
+    // Then update database
     const { error } = await supabase
       .from('items')
       .update({ quantity: newQuantity })
       .eq('id', itemId)
 
-    if (!error) {
-      await fetchItemData()
-      setEditingQuantity(false)
+    if (error) {
+      // Revert on error
+      console.error('Error updating quantity:', error)
+      fetchItemData()
     }
   }
 

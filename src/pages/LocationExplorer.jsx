@@ -77,7 +77,7 @@ export default function LocationExplorer() {
         itemsQuery = itemsQuery.is('location_id', null)
       }
 
-      const { data: itemsData } = await itemsQuery
+      const { data: itemsData } = await itemsQuery.order('name')
 
       setItems(itemsData || [])
     } catch (error) {
@@ -100,12 +100,23 @@ export default function LocationExplorer() {
     if (!item) return
 
     const newQuantity = Math.max(0, item.quantity + delta)
+
+    // Optimistically update local state first
+    setItems(prevItems =>
+      prevItems.map(i =>
+        i.id === itemId ? { ...i, quantity: newQuantity } : i
+      )
+    )
+
+    // Then update database
     const { error } = await supabase
       .from('items')
       .update({ quantity: newQuantity })
       .eq('id', itemId)
 
-    if (!error) {
+    if (error) {
+      // Revert on error
+      console.error('Error updating quantity:', error)
       fetchLocationData()
     }
   }
@@ -136,14 +147,24 @@ export default function LocationExplorer() {
       return
     }
 
+    // Optimistically update local state first
+    setItems(prevItems =>
+      prevItems.map(i =>
+        i.id === itemId ? { ...i, quantity: newQuantity } : i
+      )
+    )
+    setEditingItemId(null)
+
+    // Then update database
     const { error } = await supabase
       .from('items')
       .update({ quantity: newQuantity })
       .eq('id', itemId)
 
-    if (!error) {
-      await fetchLocationData()
-      setEditingItemId(null)
+    if (error) {
+      // Revert on error
+      console.error('Error updating quantity:', error)
+      fetchLocationData()
     }
   }
 
