@@ -7,6 +7,8 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signIn, signUp, user } = useAuth()
@@ -34,9 +36,15 @@ export default function Login() {
       return
     }
 
+    if (isSignUp && (!firstName.trim() || !lastName.trim())) {
+      setError('First name and last name are required')
+      setLoading(false)
+      return
+    }
+
     try {
       const { error } = isSignUp
-        ? await signUp(email, password)
+        ? await signUp(email, password, firstName.trim(), lastName.trim())
         : await signIn(email, password)
 
       if (error) {
@@ -79,6 +87,40 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <>
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium mb-2">
+                    First Name
+                  </label>
+                  <input
+                    id="firstName"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="John"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    id="lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Doe"
+                    required
+                  />
+                </div>
+              </>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2">
                 Email
@@ -89,11 +131,11 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="you@company.com"
+                placeholder="you@stonybrook.edu"
                 required
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Only @company.com emails are allowed
+                Only @stonybrook.edu emails are allowed
               </p>
             </div>
 
@@ -127,6 +169,8 @@ export default function Login() {
               onClick={() => {
                 setIsSignUp(!isSignUp)
                 setError('')
+                setFirstName('')
+                setLastName('')
               }}
               className="text-sm text-primary hover:underline"
             >

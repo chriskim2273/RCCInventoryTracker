@@ -26,6 +26,14 @@ export default function ItemDetail() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [expandedLogIds, setExpandedLogIds] = useState(new Set())
 
+  const getUserDisplayName = (user) => {
+    if (!user) return 'Unknown User'
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`
+    }
+    return user.email || 'Unknown User'
+  }
+
   useEffect(() => {
     fetchItemData()
   }, [itemId])
@@ -128,8 +136,8 @@ export default function ItemDetail() {
           *,
           category:categories(name, icon),
           location:locations(name, path),
-          created_by_user:users!items_created_by_fkey(email),
-          checked_out_by_user:users!items_checked_out_by_fkey(email)
+          created_by_user:users!items_created_by_fkey(email, first_name, last_name),
+          checked_out_by_user:users!items_checked_out_by_fkey(email, first_name, last_name)
         `)
         .eq('id', itemId)
         .single()
@@ -141,7 +149,7 @@ export default function ItemDetail() {
           .from('item_logs')
           .select(`
             *,
-            user:users(email)
+            user:users(email, first_name, last_name)
           `)
           .eq('item_id', itemId)
           .order('timestamp', { ascending: false })
@@ -150,8 +158,8 @@ export default function ItemDetail() {
           .from('checkout_logs')
           .select(`
             *,
-            checked_out_to_user:users!checkout_logs_checked_out_to_user_id_fkey(email),
-            performed_by_user:users!checkout_logs_performed_by_fkey(email)
+            checked_out_to_user:users!checkout_logs_checked_out_to_user_id_fkey(email, first_name, last_name),
+            performed_by_user:users!checkout_logs_performed_by_fkey(email, first_name, last_name)
           `)
           .eq('item_id', itemId)
           .order('checked_out_at', { ascending: false })
@@ -426,7 +434,7 @@ export default function ItemDetail() {
                             </p>
                           )}
                           <p>
-                            <span className="font-medium">Performed By:</span> {log.performed_by_user?.email}
+                            <span className="font-medium">Performed By:</span> {getUserDisplayName(log.performed_by_user)}
                           </p>
                         </div>
 
@@ -502,7 +510,7 @@ export default function ItemDetail() {
                       </p>
                     </div>
                     <p className="text-sm mb-2">
-                      <span className="font-medium">{log.user?.email}</span>
+                      <span className="font-medium">{getUserDisplayName(log.user)}</span>
                     </p>
                     {log.changes && (
                       <div className="text-xs space-y-1 mt-2 pt-2 border-t border-border">

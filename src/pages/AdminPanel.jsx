@@ -59,6 +59,14 @@ export default function AdminPanel() {
     return String(value)
   }
 
+  const getUserDisplayName = (user) => {
+    if (!user) return 'Unknown User'
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`
+    }
+    return user.email || 'Unknown User'
+  }
+
   // Filtered data using useMemo
   const filteredAuditLogs = useMemo(() => {
     let filtered = [...auditLogs]
@@ -158,31 +166,31 @@ export default function AdminPanel() {
   const auditUsers = useMemo(() => {
     const uniqueUsers = new Map()
     auditLogs.forEach(log => {
-      if (log.user_id && log.user?.email) {
-        uniqueUsers.set(log.user_id, log.user.email)
+      if (log.user_id && log.user) {
+        uniqueUsers.set(log.user_id, log.user)
       }
     })
-    return Array.from(uniqueUsers.entries()).map(([id, email]) => ({ id, email }))
+    return Array.from(uniqueUsers.entries()).map(([id, user]) => ({ id, user }))
   }, [auditLogs])
 
   const adminAuditUsers = useMemo(() => {
     const uniqueUsers = new Map()
     adminAuditLogs.forEach(log => {
-      if (log.user_id && log.user?.email) {
-        uniqueUsers.set(log.user_id, log.user.email)
+      if (log.user_id && log.user) {
+        uniqueUsers.set(log.user_id, log.user)
       }
     })
-    return Array.from(uniqueUsers.entries()).map(([id, email]) => ({ id, email }))
+    return Array.from(uniqueUsers.entries()).map(([id, user]) => ({ id, user }))
   }, [adminAuditLogs])
 
   const deletedByUsers = useMemo(() => {
     const uniqueUsers = new Map()
       ;[...deletedItems, ...deletedLocations, ...deletedCategories].forEach(item => {
-        if (item.deleted_by && item.deleted_by_user?.email) {
-          uniqueUsers.set(item.deleted_by, item.deleted_by_user.email)
+        if (item.deleted_by && item.deleted_by_user) {
+          uniqueUsers.set(item.deleted_by, item.deleted_by_user)
         }
       })
-    return Array.from(uniqueUsers.entries()).map(([id, email]) => ({ id, email }))
+    return Array.from(uniqueUsers.entries()).map(([id, user]) => ({ id, user }))
   }, [deletedItems, deletedLocations, deletedCategories])
 
   useEffect(() => {
@@ -196,7 +204,7 @@ export default function AdminPanel() {
       if (activeTab === 'users') {
         const { data } = await supabase
           .from('users')
-          .select('*')
+          .select('*, first_name, last_name')
           .order('created_at', { ascending: false })
         setUsers(data || [])
       } else if (activeTab === 'items') {
@@ -206,7 +214,7 @@ export default function AdminPanel() {
             *,
             category:categories(name),
             location:locations(name, path),
-            created_by_user:users!items_created_by_fkey(email)
+            created_by_user:users!items_created_by_fkey(email, first_name, last_name)
           `)
           .is('deleted_at', null)
           .order('created_at', { ascending: false })
@@ -227,7 +235,7 @@ export default function AdminPanel() {
           .select(`
             *,
             item:items(name),
-            user:users(email)
+            user:users(email, first_name, last_name)
           `)
           .order('timestamp', { ascending: false })
           .limit(100)
@@ -237,7 +245,7 @@ export default function AdminPanel() {
           .from('audit_logs')
           .select(`
             *,
-            user:users(email)
+            user:users(email, first_name, last_name)
           `)
           .order('created_at', { ascending: false })
           .limit(100)
@@ -250,7 +258,7 @@ export default function AdminPanel() {
               *,
               category:categories(name),
               location:locations(name),
-              deleted_by_user:users!items_deleted_by_fkey(email)
+              deleted_by_user:users!items_deleted_by_fkey(email, first_name, last_name)
             `)
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
@@ -258,7 +266,7 @@ export default function AdminPanel() {
             .from('locations')
             .select(`
               *,
-              deleted_by_user:users!locations_deleted_by_fkey(email)
+              deleted_by_user:users!locations_deleted_by_fkey(email, first_name, last_name)
             `)
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
@@ -266,7 +274,7 @@ export default function AdminPanel() {
             .from('categories')
             .select(`
               *,
-              deleted_by_user:users!categories_deleted_by_fkey(email)
+              deleted_by_user:users!categories_deleted_by_fkey(email, first_name, last_name)
             `)
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
@@ -613,6 +621,7 @@ export default function AdminPanel() {
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Current Role</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Created At</th>
@@ -622,7 +631,12 @@ export default function AdminPanel() {
                 <tbody className="divide-y">
                   {users.map((user) => (
                     <tr key={user.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">{user.email}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {user.first_name && user.last_name
+                          ? `${user.first_name} ${user.last_name}`
+                          : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
@@ -720,7 +734,7 @@ export default function AdminPanel() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                        <td className="px-4 py-3 text-sm">{item.created_by_user?.email || 'Unknown'}</td>
+                        <td className="px-4 py-3 text-sm">{getUserDisplayName(item.created_by_user)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
@@ -909,9 +923,9 @@ export default function AdminPanel() {
                       className="w-full px-3 py-2 border rounded-md bg-background"
                     >
                       <option value="all">All Users</option>
-                      {auditUsers.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.email}
+                      {auditUsers.map(({ id, user }) => (
+                        <option key={id} value={id}>
+                          {getUserDisplayName(user)}
                         </option>
                       ))}
                     </select>
@@ -940,7 +954,7 @@ export default function AdminPanel() {
                     )}
                     {auditUserFilter !== 'all' && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
-                        User: {auditUsers.find(u => u.id === auditUserFilter)?.email}
+                        User: {getUserDisplayName(auditUsers.find(({ id }) => id === auditUserFilter)?.user)}
                         <button onClick={() => setAuditUserFilter('all')} className="hover:text-primary/80">
                           <X className="h-3 w-3" />
                         </button>
@@ -989,7 +1003,7 @@ export default function AdminPanel() {
                             <h3 className="font-semibold text-lg">{log.item?.name || 'Unknown Item'}</h3>
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {new Date(log.timestamp).toLocaleString()} • {log.user?.email || 'Unknown User'}
+                            {new Date(log.timestamp).toLocaleString()} • {getUserDisplayName(log.user)}
                           </p>
                         </div>
                       </div>
@@ -1074,9 +1088,9 @@ export default function AdminPanel() {
                       className="w-full px-3 py-2 border rounded-md bg-background"
                     >
                       <option value="all">All Users</option>
-                      {adminAuditUsers.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.email}
+                      {adminAuditUsers.map(({ id, user }) => (
+                        <option key={id} value={id}>
+                          {getUserDisplayName(user)}
                         </option>
                       ))}
                     </select>
@@ -1097,7 +1111,7 @@ export default function AdminPanel() {
                     )}
                     {adminAuditUserFilter !== 'all' && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
-                        User: {adminAuditUsers.find(u => u.id === adminAuditUserFilter)?.email}
+                        User: {getUserDisplayName(adminAuditUsers.find(({ id }) => id === adminAuditUserFilter)?.user)}
                         <button onClick={() => setAdminAuditUserFilter('all')} className="hover:text-primary/80">
                           <X className="h-3 w-3" />
                         </button>
@@ -1135,7 +1149,7 @@ export default function AdminPanel() {
                               {!log.action.includes('delete') && log.action.replace('_', ' ').toUpperCase()}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              {new Date(log.created_at).toLocaleString()} • {log.user?.email || 'Unknown User'}
+                              {new Date(log.created_at).toLocaleString()} • {getUserDisplayName(log.user)}
                             </p>
                           </div>
                         </div>
@@ -1252,9 +1266,9 @@ export default function AdminPanel() {
                       className="w-full px-3 py-2 border rounded-md bg-background"
                     >
                       <option value="all">All Users</option>
-                      {deletedByUsers.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.email}
+                      {deletedByUsers.map(({ id, user }) => (
+                        <option key={id} value={id}>
+                          {getUserDisplayName(user)}
                         </option>
                       ))}
                     </select>
@@ -1283,7 +1297,7 @@ export default function AdminPanel() {
                     )}
                     {deletedUserFilter !== 'all' && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
-                        User: {deletedByUsers.find(u => u.id === deletedUserFilter)?.email}
+                        User: {getUserDisplayName(deletedByUsers.find(({ id }) => id === deletedUserFilter)?.user)}
                         <button onClick={() => setDeletedUserFilter('all')} className="hover:text-primary/80">
                           <X className="h-3 w-3" />
                         </button>
@@ -1333,7 +1347,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(item.deleted_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm">{item.deleted_by_user?.email || 'Unknown'}</td>
+                              <td className="px-4 py-3 text-sm">{getUserDisplayName(item.deleted_by_user)}</td>
                               <td className="px-4 py-3">
                                 <button
                                   onClick={() => restoreItem(item.id)}
@@ -1380,7 +1394,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(location.deleted_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm">{location.deleted_by_user?.email || 'Unknown'}</td>
+                              <td className="px-4 py-3 text-sm">{getUserDisplayName(location.deleted_by_user)}</td>
                               <td className="px-4 py-3">
                                 <button
                                   onClick={() => restoreLocation(location.id)}
@@ -1427,7 +1441,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(category.deleted_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm">{category.deleted_by_user?.email || 'Unknown'}</td>
+                              <td className="px-4 py-3 text-sm">{getUserDisplayName(category.deleted_by_user)}</td>
                               <td className="px-4 py-3">
                                 <button
                                   onClick={() => restoreCategory(category.id)}

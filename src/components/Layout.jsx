@@ -21,6 +21,13 @@ export default function Layout() {
     navigate('/login')
   }
 
+  const getUserDisplayName = () => {
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name} ${user.last_name}`
+    }
+    return user?.email || 'User'
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-primary text-primary-foreground">
@@ -68,7 +75,7 @@ export default function Layout() {
 
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-primary-foreground/30">
                 <div className="text-sm">
-                  <div className="font-medium">{user?.email}</div>
+                  <div className="font-medium">{getUserDisplayName()}</div>
                   <div className="text-xs opacity-75 capitalize">{userRole}</div>
                 </div>
 
@@ -126,7 +133,7 @@ export default function Layout() {
 
               <div className="pt-4 mt-4 border-t border-primary-foreground/30 space-y-3">
                 <div className="text-sm">
-                  <div className="font-medium">{user?.email}</div>
+                  <div className="font-medium">{getUserDisplayName()}</div>
                   <div className="text-xs opacity-75 capitalize mt-1">{userRole}</div>
                 </div>
 

@@ -45,12 +45,21 @@ export function AuthProvider({ children }) {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('role')
+        .select('role, first_name, last_name, email')
         .eq('id', userId)
         .single()
 
       if (error) throw error
       setUserRole(data?.role || null)
+      // Store user profile data in the user object
+      if (data) {
+        setUser(prev => ({
+          ...prev,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          email: data.email
+        }))
+      }
     } catch (error) {
       console.error('Error fetching user role:', error)
       setUserRole(null)
@@ -67,10 +76,16 @@ export function AuthProvider({ children }) {
     return { data, error }
   }
 
-  const signUp = async (email, password) => {
+  const signUp = async (email, password, firstName, lastName) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        }
+      }
     })
     return { data, error }
   }
@@ -92,11 +107,13 @@ export function AuthProvider({ children }) {
     signUp,
     signOut,
     isAdmin: userRole === 'admin',
+    isCoordinator: userRole === 'coordinator',
     isEditor: userRole === 'editor',
     isViewer: userRole === 'viewer',
     isPending: userRole === 'pending',
-    canEdit: userRole === 'admin' || userRole === 'editor',
+    canEdit: userRole === 'admin' || userRole === 'coordinator' || userRole === 'editor',
     canView: userRole !== 'pending' && userRole !== null,
+    canManageUsers: userRole === 'admin',
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

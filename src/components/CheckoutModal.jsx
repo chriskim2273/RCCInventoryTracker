@@ -33,10 +33,18 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
   const fetchUsers = async () => {
     const { data } = await supabase
       .from('users')
-      .select('*')
+      .select('*, first_name, last_name')
       .neq('role', 'pending')
-      .order('email')
+      .order('first_name, last_name, email')
     setUsers(data || [])
+  }
+
+  const getUserDisplayName = (user) => {
+    if (!user) return ''
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`
+    }
+    return user.email || ''
   }
 
   const handleUserSelection = (userId) => {
@@ -45,7 +53,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
       setFormData({
         ...formData,
         checked_out_to_user_id: userId,
-        checked_out_to: selectedUser?.email || '',
+        checked_out_to: getUserDisplayName(selectedUser),
       })
     } else {
       setFormData({
@@ -151,7 +159,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
                 <option value="">Select user...</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.email} ({u.role})
+                    {getUserDisplayName(u)} ({u.role})
                   </option>
                 ))}
               </select>
