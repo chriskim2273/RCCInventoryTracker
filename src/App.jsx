@@ -5,6 +5,7 @@ import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
 import Pending from '@/pages/Pending'
 import Dashboard from '@/pages/Dashboard'
+import Items from '@/pages/Items'
 import LocationExplorer from '@/pages/LocationExplorer'
 import ItemDetail from '@/pages/ItemDetail'
 import AdminPanel from '@/pages/AdminPanel'
@@ -26,6 +27,7 @@ function App() {
             }
           >
             <Route index element={<Dashboard />} />
+            <Route path="items" element={<Items />} />
             <Route path="locations" element={<LocationExplorer />} />
             <Route path="locations/:locationId" element={<LocationExplorer />} />
             <Route path="items/:itemId" element={<ItemDetail />} />

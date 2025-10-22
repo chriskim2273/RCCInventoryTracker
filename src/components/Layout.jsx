@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useState } from 'react'
 import {
   LayoutDashboard,
+  Package,
   MapPin,
   Settings,
   LogOut,
@@ -53,6 +54,14 @@ export default function Layout() {
               >
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
+              </Link>
+
+              <Link
+                to="/items"
+                className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
+              >
+                <Package className="h-4 w-4" />
+                Items
               </Link>
 
               <Link
@@ -109,6 +118,15 @@ export default function Layout() {
               >
                 <LayoutDashboard className="h-5 w-5" />
                 Dashboard
+              </Link>
+
+              <Link
+                to="/items"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+              >
+                <Package className="h-5 w-5" />
+                Items
               </Link>
 
               <Link

@@ -12,6 +12,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     brand: '',
     serial_number: '',
     quantity: 1,
+    min_quantity: '',
     category_id: '',
     location_id: locationId || '',
     description: '',
@@ -32,6 +33,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           brand: item.brand || '',
           serial_number: item.serial_number || '',
           quantity: item.quantity || 1,
+          min_quantity: item.min_quantity || '',
           category_id: item.category_id || '',
           location_id: item.location_id || '',
           description: item.description || '',
@@ -43,6 +45,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           brand: '',
           serial_number: '',
           quantity: 1,
+          min_quantity: '',
           category_id: '',
           location_id: locationId || '',
           description: '',
@@ -144,6 +147,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         ...formData,
         image_url: imageUrl,
         quantity: parseInt(formData.quantity),
+        min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
       }
 
       if (item) {
@@ -227,6 +231,21 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
               onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
               className="w-full px-3 py-2 border rounded-md bg-background"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1 text-orange-700 dark:text-orange-400">Min Quantity Warning</label>
+            <input
+              type="number"
+              min="0"
+              placeholder="Optional"
+              value={formData.min_quantity}
+              onChange={(e) => setFormData({ ...formData, min_quantity: e.target.value })}
+              className="w-full px-3 py-2 border-2 border-orange-300 dark:border-orange-700 rounded-md bg-background focus:border-orange-500 dark:focus:border-orange-500 focus:ring-2 focus:ring-orange-200 dark:focus:ring-orange-900"
+            />
+            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+              Alert when quantity falls below this level
+            </p>
           </div>
 
           <div>

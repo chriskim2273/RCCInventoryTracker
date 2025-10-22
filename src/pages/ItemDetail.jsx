@@ -252,6 +252,7 @@ export default function ItemDetail() {
       model: 'Model',
       serial_number: 'Serial Number',
       quantity: 'Quantity',
+      min_quantity: 'Min Quantity',
       is_unique: 'Unique Item',
       category_id: 'Category',
       location_id: 'Location',
@@ -381,6 +382,19 @@ export default function ItemDetail() {
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Location</p>
                 <p className="font-medium text-sm sm:text-base truncate" title={item.location?.path || 'Unknown'}>{item.location?.path || 'Unknown'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs sm:text-sm text-muted-foreground">Min Quantity Threshold</p>
+                <p className="font-medium text-sm sm:text-base">
+                  {item.min_quantity !== null && item.min_quantity !== undefined ? (
+                    <span className={item.quantity < item.min_quantity ? 'text-orange-600 dark:text-orange-400' : ''}>
+                      {item.min_quantity}
+                      {item.quantity < item.min_quantity && ' ⚠️ Below threshold'}
+                    </span>
+                  ) : (
+                    'Not set'
+                  )}
+                </p>
               </div>
             </div>
           </div>
@@ -675,8 +689,13 @@ export default function ItemDetail() {
                   <div className="flex-1 text-sm">
                     <p className="font-medium">Checked Out</p>
                     <p className="text-xs text-muted-foreground">
-                      {checkoutLogs.find(log => !log.checked_in_at)?.checked_out_to || 'Unknown'}
+                      By: {checkoutLogs.find(log => !log.checked_in_at)?.checked_out_to || 'Unknown'}
                     </p>
+                    {checkoutLogs.find(log => !log.checked_in_at)?.checked_out_at && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(checkoutLogs.find(log => !log.checked_in_at).checked_out_at).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -687,6 +706,24 @@ export default function ItemDetail() {
                   >
                     <UserX className="h-4 w-4" />
                     Check In
+                  </button>
+                )}
+              </div>
+            ) : item.quantity === 0 ? (
+              <div>
+                <div className="flex items-center gap-2 mb-4 p-3 bg-red-100 dark:bg-red-900/30 rounded-md">
+                  <UserCheck className="h-4 w-4" />
+                  <p className="text-sm font-medium">Out of Stock</p>
+                </div>
+
+                {canEdit && (
+                  <button
+                    disabled
+                    className="w-full flex items-center justify-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-md cursor-not-allowed opacity-50"
+                    title="Cannot check out - out of stock"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    Check Out
                   </button>
                 )}
               </div>
