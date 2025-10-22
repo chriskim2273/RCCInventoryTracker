@@ -69,7 +69,51 @@ SET role = 'admin'
 WHERE email = 'your-email@company.com';
 ```
 
-## 6. Seed Initial Data (Optional)
+## 6. Configure Email (SMTP)
+
+### Using Google SMTP with Supabase
+
+#### 🔧 Prerequisites
+- A **Gmail account**
+- **2-Step Verification** enabled
+  → [https://myaccount.google.com/security](https://myaccount.google.com/security)
+
+#### 🔐 Generate an App Password
+
+1. Go to [Google App Passwords](https://myaccount.google.com/apppasswords)
+2. Sign in with your Gmail credentials.
+3. Under **Select app**, choose `Mail`.
+4. Under **Select device**, choose `Other (Custom name)` → enter `Supabase`.
+5. Click **Generate** and copy the **16-character password** (no spaces).
+
+#### ⚙️ Configure Supabase SMTP Settings
+
+In **Supabase Dashboard** → `Project Settings → Authentication → SMTP Settings`, fill in:
+
+| Field | Value |
+|-------|--------|
+| **Sender email** | your@gmail.com |
+| **Sender name** | Your Name or App Name |
+| **Host** | smtp.gmail.com |
+| **Port number** | 587 |
+| **Username** | your@gmail.com |
+| **Password** | *App Password from Google* |
+| **Minimum interval** | 60 (recommended) |
+
+Save your settings.
+
+#### 🧪 Test the Connection
+1. Click **"Send test email"** in Supabase.
+2. Check your inbox for the test message.
+
+If it succeeds, your Supabase project is now ready to send authentication and magic link emails via Gmail SMTP.
+
+#### ✅ Notes
+- Gmail's daily limit: ~100–500 emails/day (depending on your account).
+- Use this setup for development or low-volume apps.
+- For production, consider Mailgun, SendGrid, or Brevo.
+
+## 7. Seed Initial Data (Optional)
 
 Create some initial categories:
 
