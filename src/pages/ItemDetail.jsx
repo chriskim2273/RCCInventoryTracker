@@ -24,10 +24,99 @@ export default function ItemDetail() {
   const [showChangeLogs, setShowChangeLogs] = useState(false)
   const [showCheckoutLogs, setShowCheckoutLogs] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [expandedLogIds, setExpandedLogIds] = useState(new Set())
 
   useEffect(() => {
     fetchItemData()
   }, [itemId])
+
+  const consolidateLogs = (logs) => {
+    if (!logs || logs.length === 0) return []
+
+    const consolidated = []
+    let currentGroup = null
+    const TIME_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+
+    // Logs come in descending order (newest first), so we process them that way
+    logs.forEach((log) => {
+      const logTime = new Date(log.timestamp).getTime()
+
+      // Check if this log should be merged with the current group
+      // Only consolidate 'update' actions (not check_in, check_out, create, delete)
+      if (
+        currentGroup &&
+        currentGroup.user_id === log.user_id &&
+        currentGroup.action === 'update' &&
+        log.action === 'update' &&
+        (currentGroup.lastTimestamp - logTime) < TIME_WINDOW_MS
+      ) {
+        // Since logs are in reverse order (newest first):
+        // - currentGroup has the NEWEST changes
+        // - log has OLDER changes
+        // We want: old value from the OLDEST log, new value from the NEWEST log
+
+        if (log.changes?.old) {
+          Object.keys(log.changes.old).forEach((key) => {
+            // Keep updating old values as we go back in time (this will be the oldest)
+            currentGroup.mergedOldValues[key] = log.changes.old[key]
+          })
+        }
+        if (log.changes?.new) {
+          Object.keys(log.changes.new).forEach((key) => {
+            // Only set new value if we haven't seen this field before
+            // (first time we see it is the newest since we're going backwards)
+            if (!(key in currentGroup.mergedNewValues)) {
+              currentGroup.mergedNewValues[key] = log.changes.new[key]
+            }
+            // Also update old value as we go back
+            if (log.changes?.old?.[key] !== undefined) {
+              currentGroup.mergedOldValues[key] = log.changes.old[key]
+            }
+          })
+        }
+        currentGroup.count++
+        currentGroup.firstTimestamp = logTime
+        currentGroup.individualLogs.push(log) // Add to individual logs array
+      } else {
+        // Start a new group
+        if (currentGroup) {
+          // Update changes with merged values for consolidated groups
+          if (currentGroup.count > 1) {
+            currentGroup.changes = {
+              old: currentGroup.mergedOldValues,
+              new: currentGroup.mergedNewValues
+            }
+          }
+          consolidated.push(currentGroup)
+        }
+
+        currentGroup = {
+          ...log,
+          count: 1,
+          firstTimestamp: logTime,
+          lastTimestamp: logTime,
+          mergedOldValues: log.changes?.old ? { ...log.changes.old } : {},
+          mergedNewValues: log.changes?.new ? { ...log.changes.new } : {},
+          changes: log.changes,
+          individualLogs: [log] // Keep track of individual logs for expansion
+        }
+      }
+    })
+
+    // Add the last group
+    if (currentGroup) {
+      // Update changes with merged values for consolidated groups
+      if (currentGroup.count > 1) {
+        currentGroup.changes = {
+          old: currentGroup.mergedOldValues,
+          new: currentGroup.mergedNewValues
+        }
+      }
+      consolidated.push(currentGroup)
+    }
+
+    return consolidated
+  }
 
   const fetchItemData = async () => {
     setLoading(true)
@@ -68,7 +157,7 @@ export default function ItemDetail() {
           .order('checked_out_at', { ascending: false })
       ])
 
-      setLogs(logsData.data || [])
+      setLogs(consolidateLogs(logsData.data || []))
       setCheckoutLogs(checkoutLogsData.data || [])
     } catch (error) {
       console.error('Error fetching item:', error)
@@ -148,11 +237,61 @@ export default function ItemDetail() {
     }
   }
 
+  const formatFieldName = (key) => {
+    const fieldNames = {
+      name: 'Name',
+      brand: 'Brand',
+      model: 'Model',
+      serial_number: 'Serial Number',
+      quantity: 'Quantity',
+      is_unique: 'Unique Item',
+      category_id: 'Category',
+      location_id: 'Location',
+      checked_out_by: 'Checked Out By',
+      image_url: 'Image',
+      description: 'Description',
+      deleted_at: 'Deleted At',
+      deleted_by: 'Deleted By',
+    }
+    return fieldNames[key] || key
+  }
+
   const formatValue = (value) => {
-    if (value === null || value === undefined) return 'null'
-    if (typeof value === 'boolean') return value ? 'true' : 'false'
+    if (value === null || value === undefined) return 'None'
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
     if (typeof value === 'string' && value.length === 0) return '(empty)'
+    // Check if it's a UUID (category_id, location_id, etc)
+    if (typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      return '(changed)'
+    }
+    // Truncate very long URLs
+    if (typeof value === 'string' && value.startsWith('http') && value.length > 50) {
+      return 'Image updated'
+    }
     return String(value)
+  }
+
+  const shouldShowField = (key) => {
+    const hiddenFields = [
+      'id',
+      'created_at',
+      'updated_at',
+      'created_by',
+      'checkout_log_id'
+    ]
+    return !hiddenFields.includes(key)
+  }
+
+  const toggleLogExpansion = (logId) => {
+    setExpandedLogIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(logId)) {
+        newSet.delete(logId)
+      } else {
+        newSet.add(logId)
+      }
+      return newSet
+    })
   }
 
   if (loading) {
@@ -240,110 +379,6 @@ export default function ItemDetail() {
 
           <div className="bg-card border rounded-lg overflow-hidden">
             <button
-              onClick={() => setShowChangeLogs(!showChangeLogs)}
-              className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-semibold">Change Log</h2>
-                <span className="text-xs sm:text-sm text-muted-foreground">({logs.length})</span>
-              </div>
-              {showChangeLogs ? (
-                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-              )}
-            </button>
-
-            {showChangeLogs && (
-              <div className="px-4 sm:px-6 pb-4 sm:pb-6">
-                {logs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No logs yet</p>
-                ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {logs.map((log) => (
-                  <div key={log.id} className="p-3 sm:p-4 bg-muted/30 rounded-md border border-border">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
-                      <div>
-                        <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                            log.action === 'create'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : log.action === 'update'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : log.action === 'check_out'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                  : log.action === 'check_in'
-                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}
-                        >
-                          {log.action.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                    <p className="text-sm mb-2">
-                      <span className="font-medium">{log.user?.email}</span>
-                    </p>
-                    {log.changes && (
-                      <div className="text-xs space-y-1 mt-2 pt-2 border-t border-border">
-                        {log.action === 'create' && log.changes.new && (
-                          <div className="space-y-1">
-                            <p className="font-medium text-muted-foreground">Initial values:</p>
-                            <div className="ml-2 space-y-0.5">
-                              {Object.entries(log.changes.new).map(([key, value]) => {
-                                if (['id', 'created_at', 'updated_at', 'created_by'].includes(key)) return null
-                                return (
-                                  <p key={key}>
-                                    <span className="text-muted-foreground">{key}:</span>{' '}
-                                    <span className="font-medium">{formatValue(value)}</span>
-                                  </p>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        {(log.action === 'update' || log.action === 'check_out' || log.action === 'check_in') && log.changes.old && log.changes.new && (
-                          <div className="space-y-1">
-                            <p className="font-medium text-muted-foreground">Changes:</p>
-                            <div className="ml-2 space-y-1">
-                              {Object.keys(log.changes.new).map((key) => {
-                                if (['id', 'created_at', 'updated_at', 'created_by'].includes(key)) return null
-                                const oldValue = log.changes.old[key]
-                                const newValue = log.changes.new[key]
-                                if (oldValue === newValue) return null
-                                return (
-                                  <div key={key} className="flex items-start gap-2">
-                                    <span className="text-muted-foreground min-w-24">{key}:</span>
-                                    <div className="flex-1">
-                                      <span className="line-through text-red-600 dark:text-red-400">
-                                        {formatValue(oldValue)}
-                                      </span>
-                                      {' → '}
-                                      <span className="text-green-600 dark:text-green-400 font-medium">
-                                        {formatValue(newValue)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="bg-card border rounded-lg overflow-hidden">
-            <button
               onClick={() => setShowCheckoutLogs(!showCheckoutLogs)}
               className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-muted/30 transition-colors"
             >
@@ -414,6 +449,161 @@ export default function ItemDetail() {
               </div>
             )}
           </div>
+
+          <div className="bg-card border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setShowChangeLogs(!showChangeLogs)}
+              className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-semibold">Change Log</h2>
+                <span className="text-xs sm:text-sm text-muted-foreground">({logs.length})</span>
+              </div>
+              {showChangeLogs ? (
+                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+              )}
+            </button>
+
+            {showChangeLogs && (
+              <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                {logs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No logs yet</p>
+                ) : (
+                  <div className="space-y-2 sm:space-y-3">
+                    {logs.map((log) => (
+                  <div key={log.id} className="p-3 sm:p-4 bg-muted/30 rounded-md border border-border">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${
+                            log.action === 'create'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : log.action === 'update'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                : log.action === 'check_out'
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                  : log.action === 'check_in'
+                                    ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}
+                        >
+                          {log.action.replace('_', ' ')}
+                        </span>
+                        {log.count > 1 && (
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            {log.count} edits
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                    <p className="text-sm mb-2">
+                      <span className="font-medium">{log.user?.email}</span>
+                    </p>
+                    {log.changes && (
+                      <div className="text-xs space-y-1 mt-2 pt-2 border-t border-border">
+                        {log.action === 'create' && log.changes.new && (
+                          <div className="space-y-1">
+                            <p className="font-medium text-muted-foreground">Initial values:</p>
+                            <div className="ml-2 space-y-0.5">
+                              {Object.entries(log.changes.new).map(([key, value]) => {
+                                if (!shouldShowField(key)) return null
+                                return (
+                                  <p key={key}>
+                                    <span className="text-muted-foreground">{formatFieldName(key)}:</span>{' '}
+                                    <span className="font-medium">{formatValue(value)}</span>
+                                  </p>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {(log.action === 'update' || log.action === 'check_out' || log.action === 'check_in') && log.changes.old && log.changes.new && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-muted-foreground">Changes:</p>
+                              {log.count > 1 && (
+                                <button
+                                  onClick={() => toggleLogExpansion(log.id)}
+                                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                                >
+                                  {expandedLogIds.has(log.id) ? 'Hide details' : 'Show details'}
+                                  {expandedLogIds.has(log.id) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                </button>
+                              )}
+                            </div>
+                            <div className="ml-2 space-y-1">
+                              {Object.keys(log.changes.new).map((key) => {
+                                if (!shouldShowField(key)) return null
+                                const oldValue = log.changes.old[key]
+                                const newValue = log.changes.new[key]
+                                if (oldValue === newValue) return null
+                                return (
+                                  <div key={key} className="flex items-start gap-2">
+                                    <span className="text-muted-foreground min-w-32">{formatFieldName(key)}:</span>
+                                    <div className="flex-1">
+                                      <span className="line-through text-red-600 dark:text-red-400">
+                                        {formatValue(oldValue)}
+                                      </span>
+                                      {' → '}
+                                      <span className="text-green-600 dark:text-green-400 font-medium">
+                                        {formatValue(newValue)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+
+                            {log.count > 1 && expandedLogIds.has(log.id) && log.individualLogs && (
+                              <div className="mt-3 pt-3 border-t border-border">
+                                <p className="text-xs font-medium text-muted-foreground mb-2">Individual changes ({log.count}):</p>
+                                <div className="space-y-2">
+                                  {log.individualLogs.map((individualLog, idx) => (
+                                    <div key={individualLog.id} className="ml-2 p-2 bg-background rounded border text-xs">
+                                      <p className="text-muted-foreground mb-1">
+                                        {new Date(individualLog.timestamp).toLocaleString()}
+                                      </p>
+                                      {individualLog.changes?.old && individualLog.changes?.new && (
+                                        <div className="space-y-0.5">
+                                          {Object.keys(individualLog.changes.new).map((key) => {
+                                            if (!shouldShowField(key)) return null
+                                            const oldVal = individualLog.changes.old[key]
+                                            const newVal = individualLog.changes.new[key]
+                                            if (oldVal === newVal) return null
+                                            return (
+                                              <div key={key} className="flex items-start gap-2">
+                                                <span className="text-muted-foreground min-w-24">{formatFieldName(key)}:</span>
+                                                <div className="flex-1">
+                                                  <span className="text-red-600 dark:text-red-400">{formatValue(oldVal)}</span>
+                                                  {' → '}
+                                                  <span className="text-green-600 dark:text-green-400">{formatValue(newVal)}</span>
+                                                </div>
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3 sm:space-y-4">
@@ -444,14 +634,14 @@ export default function ItemDetail() {
                 <div className="flex gap-1.5 sm:gap-2">
                   <button
                     onClick={() => handleQuantityChange(-1)}
-                    className="p-2 bg-secondary hover:bg-secondary/80 rounded-md"
+                    className="p-2 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 rounded-md transition-colors"
                     title="Decrease by 1"
                   >
                     <Minus className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => handleQuantityChange(1)}
-                    className="p-2 bg-secondary hover:bg-secondary/80 rounded-md"
+                    className="p-2 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 rounded-md transition-colors"
                     title="Increase by 1"
                   >
                     <Plus className="h-4 w-4" />
