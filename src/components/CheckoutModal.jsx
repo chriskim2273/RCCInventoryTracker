@@ -6,29 +6,33 @@ import Modal from './Modal'
 export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
   const { user } = useAuth()
   const [users, setUsers] = useState([])
+  const [availableQuantity, setAvailableQuantity] = useState(0)
   const [formData, setFormData] = useState({
     checked_out_to: '',
     checked_out_to_user_id: '',
     use_registered_user: false,
     checked_out_at: new Date().toISOString().slice(0, 16),
+    quantity: 1,
     notes: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && item) {
       fetchUsers()
+      calculateAvailableQuantity()
       setFormData({
         checked_out_to: '',
         checked_out_to_user_id: '',
         use_registered_user: false,
         checked_out_at: new Date().toISOString().slice(0, 16),
+        quantity: 1,
         notes: '',
       })
       setError(null)
     }
-  }, [isOpen])
+  }, [isOpen, item])
 
   const fetchUsers = async () => {
     const { data } = await supabase
@@ -37,6 +41,27 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
       .neq('role', 'pending')
       .order('first_name, last_name, email')
     setUsers(data || [])
+  }
+
+  const calculateAvailableQuantity = async () => {
+    if (!item) return
+
+    // Get all active checkouts for this item
+    const { data: activeCheckouts } = await supabase
+      .from('checkout_logs')
+      .select('quantity_checked_out, quantity_checked_in')
+      .eq('item_id', item.id)
+      .is('checked_in_at', null)
+
+    // Calculate total checked out quantity (only counting what hasn't been returned)
+    const checkedOutQty = (activeCheckouts || []).reduce((sum, log) => {
+      const checkedOut = log.quantity_checked_out || 0
+      const checkedIn = log.quantity_checked_in || 0
+      return sum + (checkedOut - checkedIn)
+    }, 0)
+
+    const available = Math.max(0, (item.quantity || 0) - checkedOutQty)
+    setAvailableQuantity(available)
   }
 
   const getUserDisplayName = (user) => {
@@ -70,32 +95,30 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
     setError(null)
 
     try {
+      const checkoutQty = parseInt(formData.quantity)
+
+      // Validate quantity
+      if (checkoutQty <= 0) {
+        throw new Error('Quantity must be greater than 0')
+      }
+      if (checkoutQty > availableQuantity) {
+        throw new Error(`Only ${availableQuantity} units available`)
+      }
+
       // Create checkout log entry
-      const { data: checkoutLog, error: logError } = await supabase
+      const { error: logError } = await supabase
         .from('checkout_logs')
         .insert([{
           item_id: item.id,
           checked_out_to: formData.checked_out_to,
           checked_out_to_user_id: formData.checked_out_to_user_id || null,
           checked_out_at: formData.checked_out_at,
+          quantity_checked_out: checkoutQty,
           checkout_notes: formData.notes || null,
           performed_by: user.id,
         }])
-        .select()
-        .single()
 
       if (logError) throw logError
-
-      // Update item with checkout info
-      const { error: updateError } = await supabase
-        .from('items')
-        .update({
-          checked_out_by: formData.checked_out_to_user_id || null,
-          checkout_log_id: checkoutLog.id,
-        })
-        .eq('id', item.id)
-
-      if (updateError) throw updateError
 
       onSuccess()
       onClose()
@@ -123,6 +146,22 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
           <div className="px-3 py-2 bg-muted rounded-md text-sm">
             {item.name}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Quantity *</label>
+          <input
+            type="number"
+            required
+            min="1"
+            max={availableQuantity}
+            value={formData.quantity}
+            onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+            className="w-full px-3 py-2 border rounded-md bg-background"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Available: {availableQuantity} of {item.quantity}
+          </p>
         </div>
 
         <div>

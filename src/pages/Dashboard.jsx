@@ -5,6 +5,7 @@ import { Package, MapPin, Users } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import TreeView from '@/components/TreeView'
 import LowQuantityItems from '@/components/LowQuantityItems'
+import { calculateItemAvailability } from '@/lib/itemUtils'
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -38,29 +39,38 @@ export default function Dashboard() {
         supabase.from('locations').select('*').is('deleted_at', null).order('path'),
         supabase
           .from('checkout_logs')
-          .select('id, checked_out_to, checked_out_at, checkout_notes')
+          .select('*')
           .is('checked_in_at', null),
       ])
 
       if (itemsResult.data) {
-        // Create a map of checkout logs by ID for quick lookup
-        const checkoutLogsMap = {}
+        // Group checkout logs by item_id
+        const checkoutsByItem = {}
         if (checkoutLogsResult.data) {
           checkoutLogsResult.data.forEach(log => {
-            checkoutLogsMap[log.id] = log
+            if (!checkoutsByItem[log.item_id]) {
+              checkoutsByItem[log.item_id] = []
+            }
+            checkoutsByItem[log.item_id].push(log)
           })
         }
 
-        // Merge checkout log data into items
-        const itemsWithCheckoutData = itemsResult.data.map(item => ({
-          ...item,
-          checkout_log: item.checkout_log_id ? checkoutLogsMap[item.checkout_log_id] : null
-        }))
+        // Calculate availability for each item
+        const itemsWithAvailability = await Promise.all(
+          itemsResult.data.map(async (item) => {
+            const activeCheckouts = checkoutsByItem[item.id] || []
+            const availability = await calculateItemAvailability(item, activeCheckouts)
+            return {
+              ...item,
+              ...availability
+            }
+          })
+        )
 
-        setItems(itemsWithCheckoutData)
+        setItems(itemsWithAvailability)
         setStats({
-          totalItems: itemsWithCheckoutData.length,
-          checkedOut: itemsWithCheckoutData.filter((item) => item.checkout_log_id).length,
+          totalItems: itemsWithAvailability.length,
+          checkedOut: itemsWithAvailability.filter((item) => item.checkedOutQuantity > 0).length,
           locations: locationsResult.count || 0,
         })
       }
@@ -132,11 +142,11 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 mb-4">
           <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
           <h2 className="text-lg sm:text-xl font-semibold">Currently Checked Out Items</h2>
-          <span className="text-sm text-muted-foreground">({items.filter(item => item.checkout_log_id).length})</span>
+          <span className="text-sm text-muted-foreground">({items.filter(item => item.checkedOutQuantity > 0).length})</span>
         </div>
-        {items.filter(item => item.checkout_log_id).length > 0 ? (
+        {items.filter(item => item.checkedOutQuantity > 0).length > 0 ? (
           <div className="space-y-2 sm:space-y-3">
-            {items.filter(item => item.checkout_log_id).map((item) => (
+            {items.filter(item => item.checkedOutQuantity > 0).map((item) => (
               <div key={item.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-md border hover:border-primary transition-colors">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   {item.image_url && (
@@ -164,10 +174,10 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <div className="text-right hidden sm:block">
-                    <p className="text-xs text-muted-foreground">Checked out to:</p>
-                    <p className="text-sm font-medium">{item.checkout_log?.checked_out_to || 'Unknown'}</p>
+                    <p className="text-xs text-muted-foreground">Checked out qty:</p>
+                    <p className="text-sm font-medium">{item.checkedOutQuantity} of {item.quantity}</p>
                   </div>
-                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
                     Out
                   </span>
                 </div>

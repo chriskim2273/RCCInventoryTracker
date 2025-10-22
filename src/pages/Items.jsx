@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Package, Search, Download, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
 
 export default function Items() {
   const [items, setItems] = useState([])
@@ -43,26 +44,35 @@ export default function Items() {
         supabase.from('locations').select('*').is('deleted_at', null).order('path'),
         supabase
           .from('checkout_logs')
-          .select('id, checked_out_to, checked_out_at, checkout_notes')
+          .select('*')
           .is('checked_in_at', null),
       ])
 
       if (itemsResult.data) {
-        // Create a map of checkout logs by ID for quick lookup
-        const checkoutLogsMap = {}
+        // Group checkout logs by item_id
+        const checkoutsByItem = {}
         if (checkoutLogsResult.data) {
           checkoutLogsResult.data.forEach(log => {
-            checkoutLogsMap[log.id] = log
+            if (!checkoutsByItem[log.item_id]) {
+              checkoutsByItem[log.item_id] = []
+            }
+            checkoutsByItem[log.item_id].push(log)
           })
         }
 
-        // Merge checkout log data into items
-        const itemsWithCheckoutData = itemsResult.data.map(item => ({
-          ...item,
-          checkout_log: item.checkout_log_id ? checkoutLogsMap[item.checkout_log_id] : null
-        }))
+        // Calculate availability for each item
+        const itemsWithAvailability = await Promise.all(
+          itemsResult.data.map(async (item) => {
+            const activeCheckouts = checkoutsByItem[item.id] || []
+            const availability = await calculateItemAvailability(item, activeCheckouts)
+            return {
+              ...item,
+              ...availability
+            }
+          })
+        )
 
-        setItems(itemsWithCheckoutData)
+        setItems(itemsWithAvailability)
       }
 
       if (categoriesResult.data) {
@@ -100,9 +110,9 @@ export default function Items() {
 
     // Filter by status
     if (selectedStatus === 'available') {
-      filtered = filtered.filter((item) => !item.checkout_log_id)
+      filtered = filtered.filter((item) => item.checkedOutQuantity === 0 && item.quantity > 0)
     } else if (selectedStatus === 'checked_out') {
-      filtered = filtered.filter((item) => item.checkout_log_id)
+      filtered = filtered.filter((item) => item.checkedOutQuantity > 0)
     }
 
     // Filter by location
@@ -119,34 +129,24 @@ export default function Items() {
     )
   }
 
-  const bulkCheckIn = async () => {
-    if (selectedItems.length === 0) return
-
-    const { error } = await supabase
-      .from('items')
-      .update({
-        checked_out_by: null,
-        checkout_log_id: null
-      })
-      .in('id', selectedItems)
-
-    if (!error) {
-      setSelectedItems([])
-      fetchData()
-    }
-  }
-
   const exportToCSV = () => {
-    const headers = ['Name', 'Brand', 'Serial Number', 'Quantity', 'Category', 'Location', 'Status']
-    const rows = filteredItems.map((item) => [
-      item.name,
-      item.brand || '',
-      item.serial_number || '',
-      item.quantity,
-      item.category?.name || '',
-      item.location?.path || '',
-      item.checkout_log_id ? 'Checked Out' : item.quantity === 0 ? 'Out of Stock' : 'Available',
-    ])
+    const headers = ['Name', 'Brand', 'Serial Number', 'Total Qty', 'Available Qty', 'Checked Out Qty', 'Category', 'Location', 'Status']
+    const rows = filteredItems.map((item) => {
+      const status = getItemStatus(item, item.availableQuantity, item.checkedOutQuantity)
+      const statusText = formatItemStatus(status, item.availableQuantity, item.quantity)
+
+      return [
+        item.name,
+        item.brand || '',
+        item.serial_number || '',
+        item.quantity,
+        item.availableQuantity,
+        item.checkedOutQuantity,
+        item.category?.name || '',
+        item.location?.path || '',
+        statusText,
+      ]
+    })
 
     const csvContent = [
       headers.join(','),
@@ -243,15 +243,6 @@ export default function Items() {
           <h2 className="text-lg sm:text-xl font-semibold">
             Items ({filteredItems.length})
           </h2>
-          {canEdit && selectedItems.length > 0 && (
-            <button
-              onClick={bulkCheckIn}
-              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
-            >
-              <CheckCircle className="h-4 w-4" />
-              Check In {selectedItems.length} Item{selectedItems.length > 1 ? 's' : ''}
-            </button>
-          )}
         </div>
 
         {loading ? (
@@ -289,14 +280,6 @@ export default function Items() {
                           <p className="text-sm text-muted-foreground mt-0.5">{item.brand}</p>
                         )}
                       </div>
-                      {canEdit && item.checkout_log_id && (
-                        <input
-                          type="checkbox"
-                          checked={selectedItems.includes(item.id)}
-                          onChange={() => toggleSelectItem(item.id)}
-                          className="rounded border-gray-300 mt-1 flex-shrink-0"
-                        />
-                      )}
                     </div>
                   </div>
 
@@ -317,19 +300,25 @@ export default function Items() {
                       <div className="font-medium mt-0.5 truncate">{item.location?.path || 'Unknown'}</div>
                     </div>
                     <div className="col-span-2">
-                      {item.checkout_log_id ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                          Checked Out
-                        </span>
-                      ) : item.quantity === 0 ? (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                          Out of Stock
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          Available
-                        </span>
-                      )}
+                      {(() => {
+                        const status = getItemStatus(item, item.availableQuantity, item.checkedOutQuantity)
+                        const statusText = formatItemStatus(status, item.availableQuantity, item.quantity)
+
+                        let bgColor = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        if (status === 'out_of_stock') {
+                          bgColor = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        } else if (status === 'fully_checked_out') {
+                          bgColor = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        } else if (status === 'partially_available') {
+                          bgColor = 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                        }
+
+                        return (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${bgColor}`}>
+                            {statusText}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -341,7 +330,6 @@ export default function Items() {
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
-                    {canEdit && <th className="px-4 py-3 w-12"></th>}
                     <th className="px-4 py-3 w-16"></th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
@@ -353,17 +341,6 @@ export default function Items() {
                 <tbody className="divide-y">
                   {filteredItems.map((item) => (
                     <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                      {canEdit && (
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.includes(item.id)}
-                            onChange={() => toggleSelectItem(item.id)}
-                            disabled={!item.checkout_log_id}
-                            className="rounded border-gray-300"
-                          />
-                        </td>
-                      )}
                       <td className="px-4 py-3">
                         {item.image_url ? (
                           <img
@@ -400,19 +377,25 @@ export default function Items() {
                       <td className="px-4 py-3 text-sm">{item.location?.path || 'Unknown'}</td>
                       <td className="px-4 py-3 text-sm">{item.quantity}</td>
                       <td className="px-4 py-3">
-                        {item.checkout_log_id ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            Checked Out
-                          </span>
-                        ) : item.quantity === 0 ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                            Out of Stock
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            Available
-                          </span>
-                        )}
+                        {(() => {
+                          const status = getItemStatus(item, item.availableQuantity, item.checkedOutQuantity)
+                          const statusText = formatItemStatus(status, item.availableQuantity, item.quantity)
+
+                          let bgColor = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          if (status === 'out_of_stock') {
+                            bgColor = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          } else if (status === 'fully_checked_out') {
+                            bgColor = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          } else if (status === 'partially_available') {
+                            bgColor = 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          }
+
+                          return (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${bgColor}`}>
+                              {statusText}
+                            </span>
+                          )
+                        })()}
                       </td>
                     </tr>
                   ))}

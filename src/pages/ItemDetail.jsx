@@ -7,6 +7,7 @@ import ItemModal from '@/components/ItemModal'
 import CheckoutModal from '@/components/CheckoutModal'
 import CheckinModal from '@/components/CheckinModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
 
 export default function ItemDetail() {
   const { itemId } = useParams()
@@ -15,6 +16,8 @@ export default function ItemDetail() {
   const [item, setItem] = useState(null)
   const [logs, setLogs] = useState([])
   const [checkoutLogs, setCheckoutLogs] = useState([])
+  const [activeCheckouts, setActiveCheckouts] = useState([])
+  const [availability, setAvailability] = useState({ availableQuantity: 0, checkedOutQuantity: 0 })
   const [loading, setLoading] = useState(true)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
@@ -143,6 +146,11 @@ export default function ItemDetail() {
         .single()
 
       setItem(itemData)
+
+      // Calculate item availability
+      const availabilityInfo = await calculateItemAvailability(itemData)
+      setAvailability(availabilityInfo)
+      setActiveCheckouts(availabilityInfo.activeCheckouts)
 
       const [logsData, checkoutLogsData] = await Promise.all([
         supabase
@@ -681,70 +689,94 @@ export default function ItemDetail() {
           </div>
 
           <div className="bg-card border rounded-lg p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Status</h3>
-            {item.checkout_log_id ? (
-              <div>
-                <div className="flex items-center gap-2 mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-md">
-                  <UserCheck className="h-4 w-4" />
-                  <div className="flex-1 text-sm">
-                    <p className="font-medium">Checked Out</p>
-                    <p className="text-xs text-muted-foreground">
-                      By: {checkoutLogs.find(log => !log.checked_in_at)?.checked_out_to || 'Unknown'}
-                    </p>
-                    {checkoutLogs.find(log => !log.checked_in_at)?.checked_out_at && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(checkoutLogs.find(log => !log.checked_in_at).checked_out_at).toLocaleString()}
-                      </p>
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Availability</h3>
+            {(() => {
+              const status = getItemStatus(item, availability.availableQuantity, availability.checkedOutQuantity)
+              const statusText = formatItemStatus(status, availability.availableQuantity, item.quantity)
+
+              let bgColor = 'bg-green-100 dark:bg-green-900/30'
+              let textColor = 'text-green-800 dark:text-green-200'
+
+              if (status === 'out_of_stock') {
+                bgColor = 'bg-red-100 dark:bg-red-900/30'
+                textColor = 'text-red-800 dark:text-red-200'
+              } else if (status === 'fully_checked_out') {
+                bgColor = 'bg-yellow-100 dark:bg-yellow-900/30'
+                textColor = 'text-yellow-800 dark:text-yellow-200'
+              } else if (status === 'partially_available') {
+                bgColor = 'bg-blue-100 dark:bg-blue-900/30'
+                textColor = 'text-blue-800 dark:text-blue-200'
+              }
+
+              return (
+                <div>
+                  <div className={`flex items-center justify-between gap-2 mb-4 p-3 rounded-md ${bgColor}`}>
+                    <div className="flex items-center gap-2 flex-1">
+                      <UserCheck className="h-4 w-4" />
+                      <div>
+                        <p className={`text-sm font-medium ${textColor}`}>{statusText}</p>
+                        {activeCheckouts.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activeCheckouts.length} active checkout{activeCheckouts.length > 1 ? 's' : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {activeCheckouts.length > 0 && (
+                    <div className="mb-4 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Active Checkouts:</p>
+                      {activeCheckouts.slice(0, 3).map((checkout) => {
+                        const outQty = (checkout.quantity_checked_out || 0) - (checkout.quantity_checked_in || 0)
+                        return (
+                          <div key={checkout.id} className="text-xs p-2 bg-muted/30 rounded">
+                            <p className="font-medium">{checkout.checked_out_to}</p>
+                            <p className="text-muted-foreground">
+                              {outQty} unit{outQty > 1 ? 's' : ''} • {new Date(checkout.checked_out_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )
+                      })}
+                      {activeCheckouts.length > 3 && (
+                        <p className="text-xs text-muted-foreground">+ {activeCheckouts.length - 3} more</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    {canEdit && availability.availableQuantity > 0 && (
+                      <button
+                        onClick={() => setShowCheckoutModal(true)}
+                        className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        Check Out
+                      </button>
+                    )}
+                    {canEdit && activeCheckouts.length > 0 && (
+                      <button
+                        onClick={() => setShowCheckinModal(true)}
+                        className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary px-4 py-2 rounded-md hover:bg-primary/10"
+                      >
+                        <UserX className="h-4 w-4" />
+                        Check In
+                      </button>
+                    )}
+                    {canEdit && availability.availableQuantity === 0 && activeCheckouts.length === 0 && (
+                      <button
+                        disabled
+                        className="flex-1 flex items-center justify-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-md cursor-not-allowed opacity-50"
+                        title="Cannot check out - out of stock"
+                      >
+                        <UserCheck className="h-4 w-4" />
+                        Check Out
+                      </button>
                     )}
                   </div>
                 </div>
-
-                {canEdit && (
-                  <button
-                    onClick={() => setShowCheckinModal(true)}
-                    className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
-                  >
-                    <UserX className="h-4 w-4" />
-                    Check In
-                  </button>
-                )}
-              </div>
-            ) : item.quantity === 0 ? (
-              <div>
-                <div className="flex items-center gap-2 mb-4 p-3 bg-red-100 dark:bg-red-900/30 rounded-md">
-                  <UserCheck className="h-4 w-4" />
-                  <p className="text-sm font-medium">Out of Stock</p>
-                </div>
-
-                {canEdit && (
-                  <button
-                    disabled
-                    className="w-full flex items-center justify-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-md cursor-not-allowed opacity-50"
-                    title="Cannot check out - out of stock"
-                  >
-                    <UserCheck className="h-4 w-4" />
-                    Check Out
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center gap-2 mb-4 p-3 bg-green-100 dark:bg-green-900/30 rounded-md">
-                  <UserCheck className="h-4 w-4" />
-                  <p className="text-sm font-medium">Available</p>
-                </div>
-
-                {canEdit && (
-                  <button
-                    onClick={() => setShowCheckoutModal(true)}
-                    className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
-                  >
-                    <UserCheck className="h-4 w-4" />
-                    Check Out
-                  </button>
-                )}
-              </div>
-            )}
+              )
+            })()}
           </div>
         </div>
       </div>
