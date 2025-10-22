@@ -16,6 +16,7 @@ export default function Items() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedItems, setSelectedItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [sublocationIds, setSublocationIds] = useState([])
   const { canEdit } = useAuth()
 
   useEffect(() => {
@@ -24,7 +25,37 @@ export default function Items() {
 
   useEffect(() => {
     filterItems()
-  }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery])
+  }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds])
+
+  useEffect(() => {
+    if (selectedLocation) {
+      getAllSublocationIds(selectedLocation)
+    } else {
+      setSublocationIds([])
+    }
+  }, [selectedLocation])
+
+  // Recursively get all sublocation IDs for a given location
+  const getAllSublocationIds = async (locationId) => {
+    const allIds = [locationId]
+    const queue = [locationId]
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+
+      // Get all direct children of current location
+      const children = locations.filter(loc => loc.parent_id === currentId)
+
+      for (const child of children) {
+        if (!allIds.includes(child.id)) {
+          allIds.push(child.id)
+          queue.push(child.id)
+        }
+      }
+    }
+
+    setSublocationIds(allIds)
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -99,7 +130,9 @@ export default function Items() {
         (item) =>
           item.name?.toLowerCase().includes(query) ||
           item.brand?.toLowerCase().includes(query) ||
-          item.serial_number?.toLowerCase().includes(query)
+          item.model?.toLowerCase().includes(query) ||
+          item.serial_number?.toLowerCase().includes(query) ||
+          item.stony_brook_asset_tag?.toLowerCase().includes(query)
       )
     }
 
@@ -115,9 +148,9 @@ export default function Items() {
       filtered = filtered.filter((item) => item.checkedOutQuantity > 0)
     }
 
-    // Filter by location
-    if (selectedLocation) {
-      filtered = filtered.filter((item) => item.location_id === selectedLocation)
+    // Filter by location (includes sublocations)
+    if (selectedLocation && sublocationIds.length > 0) {
+      filtered = filtered.filter((item) => sublocationIds.includes(item.location_id))
     }
 
     setFilteredItems(filtered)

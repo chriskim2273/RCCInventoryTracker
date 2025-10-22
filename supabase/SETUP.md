@@ -10,6 +10,13 @@ In your Supabase project dashboard, go to **SQL Editor** and run each migration 
 4. Run `migrations/004_add_description_column.sql` - Adds description field to items
 5. Run `migrations/005_checkout_system.sql` - Creates checkout logs table and updates triggers
 6. Run `migrations/006_checkout_logs_rls.sql` - Sets up RLS policies for checkout logs
+7. Run `migrations/007_fix_checkout_logs.sql` - Fixes checkout logs
+8. Run `migrations/008_audit_logs.sql` - Adds audit logging
+9. Run `migrations/009_soft_deletes.sql` - Implements soft deletes
+10. Run `migrations/010_add_location_images.sql` - Adds image support for locations
+11. Run `migrations/011_add_min_quantity.sql` - Adds minimum quantity warnings
+12. Run `migrations/012_add_quantity_checkout.sql` - Adds quantity checkout system
+13. Run `migrations/013_add_stony_brook_asset_tag.sql` - Adds Stony Brook Asset Tag field
 
 **Important**: Run migrations in the exact order listed above.
 
@@ -158,13 +165,21 @@ Create some initial categories:
 ```sql
 INSERT INTO categories (name, icon) VALUES
   ('Laptops', '💻'),
-  ('Mice', '🖱️'),
-  ('Keyboards', '⌨️'),
-  ('Monitors', '🖥️'),
-  ('Cables', '🔌'),
+  ('Computer Accessories', '🖱️'),
+  ('Cleaning/Maintenance', '🧼'),
+  ('Furniture', '🛋️'),
+  ('Cables/Wires', '🔌'),
+  ('Office/Art Supplies', '✏️'),
   ('Adapters', '🔄'),
-  ('Headphones', '🎧'),
-  ('Webcams', '📹'),
+  ('Board Games', '🎲'),
+  ('Microphones', '🎤'),
+  ('Projectors', '📽️'),
+  ('Batteries', '🔋'),
+  ('First Aid', '⛑️'),
+  ('Event Supplies', '🎫'),
+  ('Organization', '🗃️'),
+  ('Lights', '💡'),
+  ('Music Equipment', '🎶'),
   ('Other', '📦');
 ```
 

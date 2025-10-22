@@ -10,7 +10,9 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
+    model: '',
     serial_number: '',
+    stony_brook_asset_tag: '',
     quantity: 1,
     min_quantity: '',
     category_id: '',
@@ -32,7 +34,9 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         setFormData({
           name: item.name || '',
           brand: item.brand || '',
+          model: item.model || '',
           serial_number: item.serial_number || '',
+          stony_brook_asset_tag: item.stony_brook_asset_tag || '',
           quantity: item.quantity || 1,
           min_quantity: item.min_quantity || '',
           category_id: item.category_id || '',
@@ -44,7 +48,9 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         setFormData({
           name: '',
           brand: '',
+          model: '',
           serial_number: '',
+          stony_brook_asset_tag: '',
           quantity: 1,
           min_quantity: '',
           category_id: '',
@@ -277,11 +283,31 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">Model</label>
+            <input
+              type="text"
+              value={formData.model}
+              onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md bg-background"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Serial Number</label>
             <input
               type="text"
               value={formData.serial_number}
               onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md bg-background"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Stony Brook Asset Tag</label>
+            <input
+              type="text"
+              value={formData.stony_brook_asset_tag}
+              onChange={(e) => setFormData({ ...formData, stony_brook_asset_tag: e.target.value })}
               className="w-full px-3 py-2 border rounded-md bg-background"
             />
           </div>

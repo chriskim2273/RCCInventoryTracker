@@ -13,6 +13,7 @@ export default function LocationExplorer() {
   const [currentLocation, setCurrentLocation] = useState(null)
   const [childLocations, setChildLocations] = useState([])
   const [items, setItems] = useState([])
+  const [breadcrumbs, setBreadcrumbs] = useState([])
   const [loading, setLoading] = useState(true)
   const [showItemModal, setShowItemModal] = useState(false)
   const [showLocationModal, setShowLocationModal] = useState(false)
@@ -32,6 +33,38 @@ export default function LocationExplorer() {
     fetchLocationData()
   }, [locationId])
 
+  const buildBreadcrumbs = async (location) => {
+    if (!location) {
+      setBreadcrumbs([])
+      return
+    }
+
+    const breadcrumbArray = []
+    let currentLoc = location
+
+    // Traverse up the parent chain
+    while (currentLoc) {
+      breadcrumbArray.unshift({
+        id: currentLoc.id,
+        name: currentLoc.name,
+      })
+
+      if (currentLoc.parent_id) {
+        const { data: parentData } = await supabase
+          .from('locations')
+          .select('*')
+          .eq('id', currentLoc.parent_id)
+          .is('deleted_at', null)
+          .single()
+        currentLoc = parentData
+      } else {
+        currentLoc = null
+      }
+    }
+
+    setBreadcrumbs(breadcrumbArray)
+  }
+
   const fetchLocationData = async () => {
     setLoading(true)
 
@@ -44,8 +77,12 @@ export default function LocationExplorer() {
           .is('deleted_at', null)
           .single()
         setCurrentLocation(data)
+
+        // Build breadcrumbs by fetching all parent locations
+        await buildBreadcrumbs(data)
       } else {
         setCurrentLocation(null)
+        setBreadcrumbs([])
       }
 
       let childrenQuery = supabase
@@ -85,11 +122,6 @@ export default function LocationExplorer() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const parseBreadcrumbs = () => {
-    if (!currentLocation?.path) return []
-    return currentLocation.path.split(' / ')
   }
 
   const handleQuantityChange = async (itemId, delta, e) => {
@@ -310,10 +342,19 @@ export default function LocationExplorer() {
             <Link to="/locations" className="hover:text-primary flex-shrink-0">
               <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Link>
-            {parseBreadcrumbs().map((crumb, idx) => (
-              <div key={idx} className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {breadcrumbs.map((crumb, idx) => (
+              <div key={crumb.id} className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                 <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="whitespace-nowrap">{crumb}</span>
+                {idx === breadcrumbs.length - 1 ? (
+                  <span className="whitespace-nowrap">{crumb.name}</span>
+                ) : (
+                  <Link
+                    to={`/locations/${crumb.id}`}
+                    className="whitespace-nowrap hover:text-primary transition-colors"
+                  >
+                    {crumb.name}
+                  </Link>
+                )}
               </div>
             ))}
           </div>

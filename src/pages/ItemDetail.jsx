@@ -278,6 +278,7 @@ export default function ItemDetail() {
       brand: 'Brand',
       model: 'Model',
       serial_number: 'Serial Number',
+      stony_brook_asset_tag: 'Stony Brook Asset Tag',
       quantity: 'Quantity',
       min_quantity: 'Min Quantity',
       is_unique: 'Unique Item',
@@ -405,6 +406,10 @@ export default function ItemDetail() {
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Serial Number</p>
                 <p className="font-medium text-sm sm:text-base break-all">{item.serial_number || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm text-muted-foreground">Stony Brook Asset Tag</p>
+                <p className="font-medium text-sm sm:text-base break-all">{item.stony_brook_asset_tag || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Location</p>
