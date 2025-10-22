@@ -56,19 +56,19 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-3 sm:p-4">
       <div className="w-full max-w-md">
-        <div className="bg-card border rounded-lg shadow-lg p-8">
-          <div className="flex flex-col items-center justify-center mb-8">
+        <div className="bg-card border rounded-lg shadow-lg p-6 sm:p-8">
+          <div className="flex flex-col items-center justify-center mb-6 sm:mb-8">
             <img
               src={sbuLogo}
               alt="Stony Brook University"
-              className="h-20 w-20 object-contain mb-3"
+              className="h-16 w-16 sm:h-20 sm:w-20 object-contain mb-3"
             />
-            <h1 className="text-xl font-bold">RCC Inventory Tracker</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-center">RCC Inventory Tracker</h1>
           </div>
 
-          <h2 className="text-xl font-semibold mb-6 text-center">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-center">
             {isSignUp ? 'Create Account' : 'Sign In'}
           </h2>
 

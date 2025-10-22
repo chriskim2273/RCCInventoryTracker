@@ -154,50 +154,50 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to your inventory management system</p>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Welcome to your inventory management system</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card border rounded-lg p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-card border rounded-lg p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Items</p>
-              <p className="text-3xl font-bold mt-1">{stats.totalItems}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total Items</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1">{stats.totalItems}</p>
             </div>
-            <Package className="h-8 w-8 text-muted-foreground" />
+            <Package className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
           </div>
         </div>
 
-        <div className="bg-card border rounded-lg p-6">
+        <div className="bg-card border rounded-lg p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Checked Out</p>
-              <p className="text-3xl font-bold mt-1">{stats.checkedOut}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Checked Out</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1">{stats.checkedOut}</p>
             </div>
-            <Users className="h-8 w-8 text-muted-foreground" />
+            <Users className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
           </div>
         </div>
 
-        <div className="bg-card border rounded-lg p-6">
+        <div className="bg-card border rounded-lg p-4 sm:p-6 sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Locations</p>
-              <p className="text-3xl font-bold mt-1">{stats.locations}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Locations</p>
+              <p className="text-2xl sm:text-3xl font-bold mt-1">{stats.locations}</p>
             </div>
-            <MapPin className="h-8 w-8 text-muted-foreground" />
+            <MapPin className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
           </div>
         </div>
       </div>
 
-      <div className="bg-card border rounded-lg p-6">
+      <div className="bg-card border rounded-lg p-4 sm:p-6">
         <div className="flex items-center gap-2 mb-4">
-          <MapPin className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Location Hierarchy</h2>
+          <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+          <h2 className="text-lg sm:text-xl font-semibold">Location Hierarchy</h2>
         </div>
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-64 sm:max-h-96 overflow-y-auto">
           <TreeView
             locations={locations}
             onLocationClick={(location) => setSelectedLocation(location.id)}
@@ -205,34 +205,35 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search items by name, brand, or serial number..."
+              placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-md bg-background"
+              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border rounded-md bg-background"
             />
           </div>
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-secondary transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 border rounded-md hover:bg-secondary transition-colors text-sm sm:text-base whitespace-nowrap"
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            <span className="hidden sm:inline">Export CSV</span>
+            <span className="sm:hidden">Export</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Category</label>
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Category</label>
             <select
               value={selectedCategory || ''}
               onChange={(e) => setSelectedCategory(e.target.value || null)}
-              className="w-full px-3 py-2 border rounded-md bg-background"
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="">All Categories</option>
               {categories.map((category) => (
@@ -244,11 +245,11 @@ export default function Dashboard() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Status</label>
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Status</label>
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md bg-background"
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="all">All Statuses</option>
               <option value="available">Available</option>
@@ -256,12 +257,12 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Location</label>
+          <div className="sm:col-span-2 lg:col-span-1">
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Location</label>
             <select
               value={selectedLocation || ''}
               onChange={(e) => setSelectedLocation(e.target.value || null)}
-              className="w-full px-3 py-2 border rounded-md bg-background"
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="">All Locations</option>
               {locations.map((location) => (
@@ -275,14 +276,14 @@ export default function Dashboard() {
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold">
             Items ({filteredItems.length})
           </h2>
           {canEdit && selectedItems.length > 0 && (
             <button
               onClick={bulkCheckIn}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
+              className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
             >
               <CheckCircle className="h-4 w-4" />
               Check In {selectedItems.length} Item{selectedItems.length > 1 ? 's' : ''}
@@ -291,73 +292,134 @@ export default function Dashboard() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          <div className="text-center py-8 text-sm text-muted-foreground">Loading...</div>
         ) : filteredItems.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 text-sm text-muted-foreground">
             No items found. {searchQuery || selectedCategory || selectedStatus !== 'all' || selectedLocation ? 'Try adjusting your filters.' : 'Start by adding items to your inventory.'}
           </div>
         ) : (
-          <div className="bg-card border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  {canEdit && <th className="px-4 py-3 w-12"></th>}
-                  <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Quantity</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                    {canEdit && (
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedItems.includes(item.id)}
-                          onChange={() => toggleSelectItem(item.id)}
-                          disabled={!item.checked_out_by}
-                          className="rounded border-gray-300"
-                        />
-                      </td>
-                    )}
-                    <td className="px-4 py-3">
+          <>
+            {/* Mobile Card View */}
+            <div className="lg:hidden space-y-3">
+              {filteredItems.map((item) => (
+                <div key={item.id} className="bg-card border rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
                       <Link
                         to={`/items/${item.id}`}
-                        className="text-primary hover:underline font-medium"
+                        className="text-primary hover:underline font-medium text-base block truncate"
                       >
                         {item.name}
                       </Link>
                       {item.brand && (
-                        <span className="text-sm text-muted-foreground ml-2">({item.brand})</span>
+                        <p className="text-sm text-muted-foreground mt-0.5">{item.brand}</p>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 text-sm">
-                        {item.category?.icon && <span>{item.category.icon}</span>}
+                    </div>
+                    {canEdit && item.checked_out_by && (
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.includes(item.id)}
+                        onChange={() => toggleSelectItem(item.id)}
+                        className="rounded border-gray-300 mt-1 flex-shrink-0"
+                      />
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Category:</span>
+                      <div className="font-medium mt-0.5">
+                        {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
                         {item.category?.name || 'Uncategorized'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm">{item.location?.path || 'Unknown'}</td>
-                    <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                    <td className="px-4 py-3">
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Quantity:</span>
+                      <div className="font-medium mt-0.5">{item.quantity}</div>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Location:</span>
+                      <div className="font-medium mt-0.5 truncate">{item.location?.path || 'Unknown'}</div>
+                    </div>
+                    <div className="col-span-2">
                       {item.checked_out_by ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                           Checked Out
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                           Available
                         </span>
                       )}
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-card border rounded-lg overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    {canEdit && <th className="px-4 py-3 w-12"></th>}
+                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Quantity</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                      {canEdit && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.includes(item.id)}
+                            onChange={() => toggleSelectItem(item.id)}
+                            disabled={!item.checked_out_by}
+                            className="rounded border-gray-300"
+                          />
+                        </td>
+                      )}
+                      <td className="px-4 py-3">
+                        <Link
+                          to={`/items/${item.id}`}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          {item.name}
+                        </Link>
+                        {item.brand && (
+                          <span className="text-sm text-muted-foreground ml-2">({item.brand})</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 text-sm">
+                          {item.category?.icon && <span>{item.category.icon}</span>}
+                          {item.category?.name || 'Uncategorized'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{item.location?.path || 'Unknown'}</td>
+                      <td className="px-4 py-3 text-sm">{item.quantity}</td>
+                      <td className="px-4 py-3">
+                        {item.checked_out_by ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                            Checked Out
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Available
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>

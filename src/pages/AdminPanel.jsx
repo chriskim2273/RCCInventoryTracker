@@ -5,6 +5,7 @@ import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import RoleChangeConfirmationModal from '@/components/RoleChangeConfirmationModal'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function AdminPanel() {
@@ -32,7 +33,12 @@ export default function AdminPanel() {
     name: null,
     affectedData: null,
   })
-  const { user: currentUser } = useAuth()
+  const [showRoleChangeModal, setShowRoleChangeModal] = useState(false)
+  const [roleChangeData, setRoleChangeData] = useState({
+    user: null,
+    newRole: null,
+  })
+  const { user: currentUser, canManageUsers } = useAuth()
 
   // Filter states
   const [auditSearchQuery, setAuditSearchQuery] = useState('')
@@ -171,11 +177,11 @@ export default function AdminPanel() {
 
   const deletedByUsers = useMemo(() => {
     const uniqueUsers = new Map()
-    ;[...deletedItems, ...deletedLocations, ...deletedCategories].forEach(item => {
-      if (item.deleted_by && item.deleted_by_user?.email) {
-        uniqueUsers.set(item.deleted_by, item.deleted_by_user.email)
-      }
-    })
+      ;[...deletedItems, ...deletedLocations, ...deletedCategories].forEach(item => {
+        if (item.deleted_by && item.deleted_by_user?.email) {
+          uniqueUsers.set(item.deleted_by, item.deleted_by_user.email)
+        }
+      })
     return Array.from(uniqueUsers.entries()).map(([id, email]) => ({ id, email }))
   }, [deletedItems, deletedLocations, deletedCategories])
 
@@ -276,11 +282,51 @@ export default function AdminPanel() {
     }
   }
 
-  const updateUserRole = async (userId, newRole) => {
-    const { error } = await supabase.from('users').update({ role: newRole }).eq('id', userId)
+  const prepareRoleChange = (user, newRole) => {
+    // Don't show modal if role hasn't changed
+    if (user.role === newRole) return
 
-    if (!error) {
-      fetchData()
+    setRoleChangeData({ user, newRole })
+    setShowRoleChangeModal(true)
+  }
+
+  const updateUserRole = async () => {
+    const { user, newRole } = roleChangeData
+
+    try {
+      // Update the user's role
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', user.id)
+
+      if (updateError) throw updateError
+
+      // Log the role change in admin audit logs
+      const { error: auditError } = await supabase
+        .from('admin_audit_logs')
+        .insert({
+          admin_id: currentUser.id,
+          action: 'role_change',
+          target_user_id: user.id,
+          details: {
+            user_email: user.email,
+            old_role: user.role,
+            new_role: newRole,
+            timestamp: new Date().toISOString()
+          }
+        })
+
+      if (auditError) console.error('Error logging role change:', auditError)
+
+      // Refresh data
+      await fetchData()
+
+      setShowRoleChangeModal(false)
+      setRoleChangeData({ user: null, newRole: null })
+    } catch (error) {
+      console.error('Error updating user role:', error)
+      throw error
     }
   }
 
@@ -468,21 +514,20 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
-        <p className="text-muted-foreground">Manage users, categories, and view audit logs</p>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Admin Panel</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">Manage users, categories, and view audit logs</p>
       </div>
 
-      <div className="border-b">
-        <div className="flex gap-4">
+      <div className="border-b -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 sm:gap-4 overflow-x-auto pb-px scrollbar-hide">
           <button
             onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'users'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'users'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <Users className="h-4 w-4" />
             Users
@@ -490,11 +535,10 @@ export default function AdminPanel() {
 
           <button
             onClick={() => setActiveTab('items')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'items'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'items'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <Package className="h-4 w-4" />
             Items
@@ -502,11 +546,10 @@ export default function AdminPanel() {
 
           <button
             onClick={() => setActiveTab('locations')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'locations'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'locations'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <MapPin className="h-4 w-4" />
             Locations
@@ -514,11 +557,10 @@ export default function AdminPanel() {
 
           <button
             onClick={() => setActiveTab('categories')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'categories'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'categories'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <Tag className="h-4 w-4" />
             Categories
@@ -526,38 +568,38 @@ export default function AdminPanel() {
 
           <button
             onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'audit'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'audit'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <History className="h-4 w-4" />
-            Item Audit Trail
+            <span className="hidden sm:inline">Item Audit Trail</span>
+            <span className="sm:hidden">Audit</span>
           </button>
 
           <button
             onClick={() => setActiveTab('admin-audit')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'admin-audit'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'admin-audit'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <Shield className="h-4 w-4" />
-            Admin Actions
+            <span className="hidden sm:inline">Admin Actions</span>
+            <span className="sm:hidden">Admin</span>
           </button>
 
           <button
             onClick={() => setActiveTab('deleted')}
-            className={`flex items-center gap-2 px-4 py-2 border-b-2 transition-colors ${
-              activeTab === 'deleted'
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'deleted'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-primary'
-            }`}
+              }`}
           >
             <Trash2 className="h-4 w-4" />
-            Deleted Items
+            <span className="hidden sm:inline">Deleted Items</span>
+            <span className="sm:hidden">Deleted</span>
           </button>
         </div>
       </div>
@@ -583,15 +625,16 @@ export default function AdminPanel() {
                       <td className="px-4 py-3 font-medium">{user.email}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${
-                            user.role === 'admin'
+                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
                               ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                              : user.role === 'editor'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : user.role === 'viewer'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                          }`}
+                              : user.role === 'coordinator'
+                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+                                : user.role === 'editor'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  : user.role === 'viewer'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                            }`}
                         >
                           {user.role}
                         </span>
@@ -600,16 +643,23 @@ export default function AdminPanel() {
                         {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3">
-                        <select
-                          value={user.role}
-                          onChange={(e) => updateUserRole(user.id, e.target.value)}
-                          className="text-sm border rounded px-2 py-1 bg-background"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="viewer">Viewer</option>
-                          <option value="editor">Editor</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        {canManageUsers ? (
+                          <select
+                            value={user.role}
+                            onChange={(e) => prepareRoleChange(user, e.target.value)}
+                            className="text-sm border rounded px-2 py-1 bg-background"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="editor">Editor</option>
+                            <option value="coordinator">Coordinator</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            No permission - Contact an Admin
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -638,63 +688,63 @@ export default function AdminPanel() {
                   <h2 className="text-lg font-semibold">All Items ({items.length})</h2>
                   <p className="text-sm text-muted-foreground mt-1">Manage and delete items</p>
                 </div>
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Quantity</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Created By</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          {item.serial_number && (
-                            <p className="text-xs text-muted-foreground">SN: {item.serial_number}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{item.category?.name || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <div>
-                          <p>{item.location?.name || 'N/A'}</p>
-                          {item.location?.path && (
-                            <p className="text-xs text-muted-foreground">{item.location.path}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                      <td className="px-4 py-3 text-sm">{item.created_by_user?.email || 'Unknown'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingItem(item)
-                              setShowItemModal(true)
-                            }}
-                            className="text-primary hover:underline text-sm"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => prepareDeleteItem(item.id, item.name)}
-                            className="text-destructive hover:underline text-sm"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Quantity</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Created By</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y">
+                    {items.map((item) => (
+                      <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="font-medium">{item.name}</p>
+                            {item.serial_number && (
+                              <p className="text-xs text-muted-foreground">SN: {item.serial_number}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm">{item.category?.name || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <div>
+                            <p>{item.location?.name || 'N/A'}</p>
+                            {item.location?.path && (
+                              <p className="text-xs text-muted-foreground">{item.location.path}</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm">{item.quantity}</td>
+                        <td className="px-4 py-3 text-sm">{item.created_by_user?.email || 'Unknown'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingItem(item)
+                                setShowItemModal(true)
+                              }}
+                              className="text-primary hover:underline text-sm"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => prepareDeleteItem(item.id, item.name)}
+                              className="text-destructive hover:underline text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -718,47 +768,47 @@ export default function AdminPanel() {
                   <h2 className="text-lg font-semibold">All Locations ({locations.length})</h2>
                   <p className="text-sm text-muted-foreground mt-1">Manage and delete locations</p>
                 </div>
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Full Path</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Parent</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {locations.map((location) => (
-                    <tr key={location.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">{location.name}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {location.parent_id ? 'Has parent' : 'Root level'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingLocation(location)
-                              setShowLocationModal(true)
-                            }}
-                            className="text-primary hover:underline text-sm"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => prepareDeleteLocation(location.id, location.name)}
-                            className="text-destructive hover:underline text-sm"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Full Path</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Parent</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y">
+                    {locations.map((location) => (
+                      <tr key={location.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-medium">{location.name}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {location.parent_id ? 'Has parent' : 'Root level'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingLocation(location)
+                                setShowLocationModal(true)
+                              }}
+                              className="text-primary hover:underline text-sm"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => prepareDeleteLocation(location.id, location.name)}
+                              className="text-destructive hover:underline text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -770,8 +820,9 @@ export default function AdminPanel() {
                     setEditingCategory(null)
                     setShowCategoryModal(true)
                   }}
-                  className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
+                  className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 flex items-center gap-2"
                 >
+                  <Plus className="w-4 h-4" />
                   Add Category
                 </button>
               </div>
@@ -922,8 +973,7 @@ export default function AdminPanel() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span
-                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium capitalize ${
-                                log.action === 'create'
+                              className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium capitalize ${log.action === 'create'
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                   : log.action === 'update'
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
@@ -932,7 +982,7 @@ export default function AdminPanel() {
                                       : log.action === 'restore'
                                         ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
                                         : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }`}
+                                }`}
                             >
                               {log.action.replace('_', ' ')}
                             </span>
@@ -1257,143 +1307,143 @@ export default function AdminPanel() {
               {(deletedTypeFilter === 'all' || deletedTypeFilter === 'items') && (
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Deleted Items ({filteredDeletedItems.length})</h2>
-                {filteredDeletedItems.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
-                    {deletedItems.length === 0 ? 'No deleted items' : 'No items match your filters'}
-                  </div>
-                ) : (
-                  <div className="bg-card border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredDeletedItems.map((item) => (
-                          <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                            <td className="px-4 py-3 font-medium">{item.name}</td>
-                            <td className="px-4 py-3 text-sm">{item.category?.name || 'N/A'}</td>
-                            <td className="px-4 py-3 text-sm">{item.location?.name || 'N/A'}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                              {new Date(item.deleted_at).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-3 text-sm">{item.deleted_by_user?.email || 'Unknown'}</td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => restoreItem(item.id)}
-                                className="flex items-center gap-1 text-sm text-primary hover:underline"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                Restore
-                              </button>
-                            </td>
+                  {filteredDeletedItems.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
+                      {deletedItems.length === 0 ? 'No deleted items' : 'No items match your filters'}
+                    </div>
+                  ) : (
+                    <div className="bg-card border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                        </thead>
+                        <tbody className="divide-y">
+                          {filteredDeletedItems.map((item) => (
+                            <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3 font-medium">{item.name}</td>
+                              <td className="px-4 py-3 text-sm">{item.category?.name || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm">{item.location?.name || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {new Date(item.deleted_at).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm">{item.deleted_by_user?.email || 'Unknown'}</td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => restoreItem(item.id)}
+                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                  Restore
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Deleted Locations */}
               {(deletedTypeFilter === 'all' || deletedTypeFilter === 'locations') && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Deleted Locations ({filteredDeletedLocations.length})</h2>
-                {filteredDeletedLocations.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
-                    {deletedLocations.length === 0 ? 'No deleted locations' : 'No locations match your filters'}
-                  </div>
-                ) : (
-                  <div className="bg-card border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Path</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredDeletedLocations.map((location) => (
-                          <tr key={location.id} className="hover:bg-muted/30 transition-colors">
-                            <td className="px-4 py-3 font-medium">{location.name}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                              {new Date(location.deleted_at).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-3 text-sm">{location.deleted_by_user?.email || 'Unknown'}</td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => restoreLocation(location.id)}
-                                className="flex items-center gap-1 text-sm text-primary hover:underline"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                Restore
-                              </button>
-                            </td>
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Deleted Locations ({filteredDeletedLocations.length})</h2>
+                  {filteredDeletedLocations.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
+                      {deletedLocations.length === 0 ? 'No deleted locations' : 'No locations match your filters'}
+                    </div>
+                  ) : (
+                    <div className="bg-card border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Path</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                        </thead>
+                        <tbody className="divide-y">
+                          {filteredDeletedLocations.map((location) => (
+                            <tr key={location.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3 font-medium">{location.name}</td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {new Date(location.deleted_at).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm">{location.deleted_by_user?.email || 'Unknown'}</td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => restoreLocation(location.id)}
+                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                  Restore
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Deleted Categories */}
               {(deletedTypeFilter === 'all' || deletedTypeFilter === 'categories') && (
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Deleted Categories ({filteredDeletedCategories.length})</h2>
-                {filteredDeletedCategories.length === 0 ? (
-                  <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
-                    {deletedCategories.length === 0 ? 'No deleted categories' : 'No categories match your filters'}
-                  </div>
-                ) : (
-                  <div className="bg-card border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Icon</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredDeletedCategories.map((category) => (
-                          <tr key={category.id} className="hover:bg-muted/30 transition-colors">
-                            <td className="px-4 py-3 font-medium">{category.name}</td>
-                            <td className="px-4 py-3 text-xl">{category.icon}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">
-                              {new Date(category.deleted_at).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-3 text-sm">{category.deleted_by_user?.email || 'Unknown'}</td>
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => restoreCategory(category.id)}
-                                className="flex items-center gap-1 text-sm text-primary hover:underline"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                Restore
-                              </button>
-                            </td>
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Deleted Categories ({filteredDeletedCategories.length})</h2>
+                  {filteredDeletedCategories.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
+                      {deletedCategories.length === 0 ? 'No deleted categories' : 'No categories match your filters'}
+                    </div>
+                  ) : (
+                    <div className="bg-card border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Icon</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                        </thead>
+                        <tbody className="divide-y">
+                          {filteredDeletedCategories.map((category) => (
+                            <tr key={category.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3 font-medium">{category.name}</td>
+                              <td className="px-4 py-3 text-xl">{category.icon}</td>
+                              <td className="px-4 py-3 text-sm text-muted-foreground">
+                                {new Date(category.deleted_at).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm">{category.deleted_by_user?.email || 'Unknown'}</td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => restoreCategory(category.id)}
+                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                  Restore
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -1439,6 +1489,18 @@ export default function AdminPanel() {
         itemType={deleteModalData.type}
         userEmail={currentUser?.email || ''}
         affectedData={deleteModalData.affectedData}
+      />
+
+      <RoleChangeConfirmationModal
+        isOpen={showRoleChangeModal}
+        onClose={() => {
+          setShowRoleChangeModal(false)
+          setRoleChangeData({ user: null, newRole: null })
+        }}
+        onConfirm={updateUserRole}
+        user={roleChangeData.user}
+        newRole={roleChangeData.newRole}
+        currentUserEmail={currentUser?.email || ''}
       />
     </div>
   )

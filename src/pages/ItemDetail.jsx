@@ -164,37 +164,40 @@ export default function ItemDetail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Back
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-card border rounded-lg p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-3xl font-bold">{item.name}</h1>
-                <p className="text-muted-foreground mt-1">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="bg-card border rounded-lg p-4 sm:p-6">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold truncate">{item.name}</h1>
+                <p className="text-sm sm:text-base text-muted-foreground mt-1">
+                  {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
                   {item.category?.name || 'Uncategorized'}
                 </p>
               </div>
 
               {canEdit && (
-                <div className="flex gap-2">
+                <div className="flex gap-1 sm:gap-2 flex-shrink-0">
                   <button
                     onClick={() => setShowEditModal(true)}
                     className="p-2 hover:bg-muted rounded-md"
+                    title="Edit item"
                   >
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
                     onClick={prepareDelete}
                     className="p-2 hover:bg-destructive/10 text-destructive rounded-md"
+                    title="Delete item"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -202,22 +205,22 @@ export default function ItemDetail() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
               <div>
-                <p className="text-muted-foreground">Brand</p>
-                <p className="font-medium">{item.brand || 'N/A'}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Brand</p>
+                <p className="font-medium text-sm sm:text-base">{item.brand || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Model</p>
-                <p className="font-medium">{item.model || 'N/A'}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Model</p>
+                <p className="font-medium text-sm sm:text-base">{item.model || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Serial Number</p>
-                <p className="font-medium">{item.serial_number || 'N/A'}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Serial Number</p>
+                <p className="font-medium text-sm sm:text-base break-all">{item.serial_number || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-muted-foreground">Location</p>
-                <p className="font-medium">{item.location?.path || 'Unknown'}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Location</p>
+                <p className="font-medium text-sm sm:text-base truncate" title={item.location?.path || 'Unknown'}>{item.location?.path || 'Unknown'}</p>
               </div>
             </div>
           </div>
@@ -225,28 +228,28 @@ export default function ItemDetail() {
           <div className="bg-card border rounded-lg overflow-hidden">
             <button
               onClick={() => setShowChangeLogs(!showChangeLogs)}
-              className="w-full flex items-center justify-between p-6 hover:bg-muted/30 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-muted/30 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-semibold">Change Log</h2>
-                <span className="text-sm text-muted-foreground">({logs.length})</span>
+                <h2 className="text-lg sm:text-xl font-semibold">Change Log</h2>
+                <span className="text-xs sm:text-sm text-muted-foreground">({logs.length})</span>
               </div>
               {showChangeLogs ? (
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
               ) : (
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
               )}
             </button>
 
             {showChangeLogs && (
-              <div className="px-6 pb-6">
+              <div className="px-4 sm:px-6 pb-4 sm:pb-6">
                 {logs.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">No logs yet</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">No logs yet</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {logs.map((log) => (
-                  <div key={log.id} className="p-4 bg-muted/30 rounded-md border border-border">
-                    <div className="flex items-start justify-between mb-2">
+                  <div key={log.id} className="p-3 sm:p-4 bg-muted/30 rounded-md border border-border">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 mb-2">
                       <div>
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${
@@ -329,28 +332,28 @@ export default function ItemDetail() {
           <div className="bg-card border rounded-lg overflow-hidden">
             <button
               onClick={() => setShowCheckoutLogs(!showCheckoutLogs)}
-              className="w-full flex items-center justify-between p-6 hover:bg-muted/30 transition-colors"
+              className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-muted/30 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                <h2 className="text-xl font-semibold">Checkout History</h2>
-                <span className="text-sm text-muted-foreground">({checkoutLogs.length})</span>
+                <History className="h-4 w-4 sm:h-5 sm:w-5" />
+                <h2 className="text-lg sm:text-xl font-semibold">Checkout History</h2>
+                <span className="text-xs sm:text-sm text-muted-foreground">({checkoutLogs.length})</span>
               </div>
               {showCheckoutLogs ? (
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
               ) : (
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
               )}
             </button>
 
             {showCheckoutLogs && (
-              <div className="px-6 pb-6">
+              <div className="px-4 sm:px-6 pb-4 sm:pb-6">
                 {checkoutLogs.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-4">No checkout history</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">No checkout history</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {checkoutLogs.map((log) => (
-                      <div key={log.id} className="p-4 bg-muted/30 rounded-md border border-border">
+                      <div key={log.id} className="p-3 sm:p-4 bg-muted/30 rounded-md border border-border">
                         <div className="mb-3">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs text-muted-foreground font-medium uppercase">Checked Out To:</span>
@@ -400,10 +403,10 @@ export default function ItemDetail() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-card border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Quantity</h3>
-            <div className="flex items-center justify-between mb-4">
+        <div className="space-y-3 sm:space-y-4">
+          <div className="bg-card border rounded-lg p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Quantity</h3>
+            <div className="flex items-center justify-between mb-3 sm:mb-4">
               {editingQuantity ? (
                 <input
                   type="number"
@@ -413,19 +416,19 @@ export default function ItemDetail() {
                   onBlur={saveQuantity}
                   onKeyDown={handleQuantityKeyDown}
                   autoFocus
-                  className="text-3xl font-bold w-32 px-2 py-1 border rounded-md bg-background"
+                  className="text-2xl sm:text-3xl font-bold w-24 sm:w-32 px-2 py-1 border rounded-md bg-background"
                 />
               ) : (
                 <span
                   onClick={startEditingQuantity}
-                  className={`text-3xl font-bold ${canEdit && !item.is_unique ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                  className={`text-2xl sm:text-3xl font-bold ${canEdit && !item.is_unique ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
                   title={canEdit && !item.is_unique ? 'Click to edit quantity' : ''}
                 >
                   {item.quantity}
                 </span>
               )}
               {!item.is_unique && canEdit && !editingQuantity && (
-                <div className="flex gap-2">
+                <div className="flex gap-1.5 sm:gap-2">
                   <button
                     onClick={() => handleQuantityChange(-1)}
                     className="p-2 bg-secondary hover:bg-secondary/80 rounded-md"
@@ -452,8 +455,8 @@ export default function ItemDetail() {
             )}
           </div>
 
-          <div className="bg-card border rounded-lg p-6">
-            <h3 className="font-semibold mb-4">Status</h3>
+          <div className="bg-card border rounded-lg p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Status</h3>
             {item.checkout_log_id ? (
               <div>
                 <div className="flex items-center gap-2 mb-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-md">

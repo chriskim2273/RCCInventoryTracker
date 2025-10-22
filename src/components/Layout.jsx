@@ -1,16 +1,20 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useState } from 'react'
 import {
   LayoutDashboard,
   MapPin,
   Settings,
-  LogOut
+  LogOut,
+  Menu,
+  X
 } from 'lucide-react'
 import sbuLogo from '@/assets/SBU_LOGO.jpeg'
 
 export default function Layout() {
   const { signOut, user, userRole, isAdmin, isCoordinator } = useAuth()
   const navigate = useNavigate()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
@@ -22,18 +26,20 @@ export default function Layout() {
       <header className="border-b bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            {/* Logo and Title */}
+            <Link to="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-90 transition-opacity">
               <img
                 src={sbuLogo}
                 alt="Stony Brook University"
-                className="h-10 w-10 object-contain"
+                className="h-8 w-8 sm:h-10 sm:w-10 object-contain flex-shrink-0"
               />
-              <div className="border-l border-primary-foreground/30 pl-3">
-                <h1 className="text-lg font-bold tracking-tight">RCC Inventory Tracker</h1>
+              <div className="border-l border-primary-foreground/30 pl-2 sm:pl-3">
+                <h1 className="text-sm sm:text-lg font-bold tracking-tight">RCC Inventory Tracker</h1>
               </div>
             </Link>
 
-            <nav className="flex items-center gap-6">
+            {/* Desktop Navigation */}
+            <nav className="hidden lg:flex items-center gap-6">
               <Link
                 to="/"
                 className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
@@ -75,11 +81,72 @@ export default function Layout() {
                 </button>
               </div>
             </nav>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 hover:opacity-80 transition-opacity"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
           </div>
+
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="lg:hidden mt-4 pt-4 border-t border-primary-foreground/30 space-y-4">
+              <Link
+                to="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+              >
+                <LayoutDashboard className="h-5 w-5" />
+                Dashboard
+              </Link>
+
+              <Link
+                to="/locations"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+              >
+                <MapPin className="h-5 w-5" />
+                Locations
+              </Link>
+
+              {(isAdmin || isCoordinator) && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+                >
+                  <Settings className="h-5 w-5" />
+                  Admin
+                </Link>
+              )}
+
+              <div className="pt-4 mt-4 border-t border-primary-foreground/30 space-y-3">
+                <div className="text-sm">
+                  <div className="font-medium">{user?.email}</div>
+                  <div className="text-xs opacity-75 capitalize mt-1">{userRole}</div>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    setMobileMenuOpen(false)
+                    await handleSignOut()
+                  }}
+                  className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-4 sm:py-8">
         <Outlet />
       </main>
     </div>

@@ -268,27 +268,27 @@ export default function LocationExplorer() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            <Link to="/locations" className="hover:text-primary">
-              <Home className="h-4 w-4" />
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground mb-2 overflow-x-auto pb-1">
+            <Link to="/locations" className="hover:text-primary flex-shrink-0">
+              <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Link>
             {parseBreadcrumbs().map((crumb, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <ChevronRight className="h-4 w-4" />
-                <span>{crumb}</span>
+              <div key={idx} className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="whitespace-nowrap">{crumb}</span>
               </div>
             ))}
           </div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-2xl sm:text-3xl font-bold truncate">
             {currentLocation?.name || 'All Locations'}
           </h1>
         </div>
 
         {canEdit && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {currentLocation && (
               <>
                 <button
@@ -296,20 +296,20 @@ export default function LocationExplorer() {
                     setEditingLocation(currentLocation)
                     setShowLocationModal(true)
                   }}
-                  className="flex items-center gap-2 border px-4 py-2 rounded-md hover:bg-secondary transition-colors"
+                  className="flex items-center gap-2 border px-3 sm:px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm"
                   title="Edit this location"
                 >
                   <Edit className="h-4 w-4" />
-                  Edit
+                  <span className="hidden sm:inline">Edit</span>
                 </button>
                 {isAdmin && (
                   <button
                     onClick={prepareDeleteCurrentLocation}
-                    className="flex items-center gap-2 border border-destructive text-destructive px-4 py-2 rounded-md hover:bg-destructive/10 transition-colors"
-                    title="Delete this location (Admin only)"
+                    className="flex items-center gap-2 border border-destructive text-destructive px-3 sm:px-4 py-2 rounded-md hover:bg-destructive/10 transition-colors text-sm"
+                    title="Delete this location"
                   >
                     <Trash2 className="h-4 w-4" />
-                    Delete
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
                 )}
               </>
@@ -319,34 +319,35 @@ export default function LocationExplorer() {
                 setEditingLocation(null)
                 setShowLocationModal(true)
               }}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2 rounded-md hover:opacity-90 text-sm whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
-              Add Location
+              <span className="hidden xs:inline">Add Location</span>
+              <span className="xs:hidden">Add</span>
             </button>
           </div>
         )}
       </div>
 
       {loading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <div className="text-center py-8 text-sm text-muted-foreground">Loading...</div>
       ) : (
         <>
           {childLocations.length > 0 && (
             <div>
-              <h2 className="text-xl font-semibold mb-4">Sub-Locations</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Sub-Locations</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {childLocations.map((location) => (
                   <div key={location.id} className="relative group">
                     <Link
                       to={`/locations/${location.id}`}
-                      className="block bg-card border rounded-lg p-6 hover:border-primary transition-colors"
+                      className="block bg-card border rounded-lg p-4 sm:p-6 hover:border-primary transition-colors"
                     >
-                      <h3 className="font-semibold">{location.name}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">{location.path}</p>
+                      <h3 className="font-semibold text-base pr-16 sm:pr-0">{location.name}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">{location.path}</p>
                     </Link>
                     {canEdit && (
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => handleEditLocation(location, e)}
                           className="p-1.5 bg-background border rounded-md hover:bg-secondary transition-colors"
@@ -358,7 +359,7 @@ export default function LocationExplorer() {
                           <button
                             onClick={(e) => prepareDeleteLocation(location, e)}
                             className="p-1.5 bg-background border border-destructive text-destructive rounded-md hover:bg-destructive/10 transition-colors"
-                            title="Delete location (Admin only)"
+                            title="Delete location"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -372,12 +373,12 @@ export default function LocationExplorer() {
           )}
 
           <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Items at this Location</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-xl font-semibold">Items at this Location</h2>
               {canEdit && (
                 <button
                   onClick={() => setShowItemModal(true)}
-                  className="flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:opacity-90"
+                  className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
                 >
                   <Plus className="h-4 w-4" />
                   Add Item
@@ -386,11 +387,11 @@ export default function LocationExplorer() {
             </div>
 
             {items.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border rounded-lg">
+              <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
                 No items at this location
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {items.map((item) => (
                   <Link
                     key={item.id}
@@ -398,9 +399,10 @@ export default function LocationExplorer() {
                     className="bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative"
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{item.name}</h3>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base truncate">{item.name}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
                           {item.category?.name || 'Uncategorized'}
                         </p>
                       </div>
@@ -421,14 +423,14 @@ export default function LocationExplorer() {
                       ) : (
                         <span
                           onClick={(e) => canEdit ? startEditingQuantity(item, e) : null}
-                          className={`text-sm font-medium ${canEdit ? 'cursor-pointer hover:text-primary transition-colors' : 'text-muted-foreground'}`}
+                          className={`text-xs sm:text-sm font-medium ${canEdit ? 'cursor-pointer hover:text-primary transition-colors' : 'text-muted-foreground'}`}
                           title={canEdit ? 'Click to edit quantity' : ''}
                         >
-                          Quantity: {item.quantity}
+                          Qty: {item.quantity}
                         </span>
                       )}
                       {canEdit && editingItemId !== item.id && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5 sm:gap-1">
                           <button
                             onClick={(e) => handleQuantityChange(item.id, -1, e)}
                             className="p-1.5 hover:bg-secondary rounded-md transition-colors"
