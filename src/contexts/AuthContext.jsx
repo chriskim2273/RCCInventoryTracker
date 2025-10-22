@@ -99,6 +99,21 @@ export function AuthProvider({ children }) {
     return { error }
   }
 
+  const resetPassword = async (email) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    return { data, error }
+  }
+
+  const resendConfirmationEmail = async (email) => {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+    })
+    return { data, error }
+  }
+
   const value = {
     user,
     userRole,
@@ -106,6 +121,8 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    resendConfirmationEmail,
     isAdmin: userRole === 'admin',
     isCoordinator: userRole === 'coordinator',
     isEditor: userRole === 'editor',

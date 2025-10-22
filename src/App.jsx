@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
+import ResetPassword from '@/pages/ResetPassword'
 import Pending from '@/pages/Pending'
 import Dashboard from '@/pages/Dashboard'
 import Items from '@/pages/Items'
@@ -16,6 +17,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/pending" element={<Pending />} />
 
           <Route
