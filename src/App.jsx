@@ -32,7 +32,7 @@ function App() {
             <Route
               path="admin"
               element={
-                <ProtectedRoute requireRole="admin">
+                <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
                   <AdminPanel />
                 </ProtectedRoute>
               }

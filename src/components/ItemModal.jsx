@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
 import { Upload, X } from 'lucide-react'
+import imageCompression from 'browser-image-compression'
 
 export default function ItemModal({ isOpen, onClose, onSuccess, item = null, locationId = null }) {
   const { user } = useAuth()
@@ -62,15 +63,55 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     setLocations(locationsRes.data || [])
   }
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result)
+      // Check if file is an image
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file')
+        return
       }
-      reader.readAsDataURL(file)
+
+      try {
+        // Compress the image
+        const options = {
+          maxSizeMB: 1,          // Maximum file size in MB
+          maxWidthOrHeight: 1920, // Maximum width or height
+          useWebWorker: true,     // Use web worker for better performance
+          fileType: 'image/jpeg'  // Convert to JPEG for better compression
+        }
+
+        const compressedFile = await imageCompression(file, options)
+
+        // Use the smaller file (compressed or original)
+        const fileToUse = compressedFile.size < file.size ? compressedFile : file
+
+        setImageFile(fileToUse)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setImagePreview(reader.result)
+        }
+        reader.readAsDataURL(fileToUse)
+
+        // Log compression results
+        console.log(`Original size: ${(file.size / 1024 / 1024).toFixed(2)} MB`)
+        console.log(`Compressed size: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`)
+        if (compressedFile.size < file.size) {
+          console.log(`Using compressed (${(((file.size - compressedFile.size) / file.size) * 100).toFixed(2)}% reduction)`)
+        } else {
+          console.log(`Using original (compressed was larger)`)
+        }
+      } catch (error) {
+        console.error('Error compressing image:', error)
+        setError('Failed to compress image. Using original.')
+        // Fallback to original file
+        setImageFile(file)
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setImagePreview(reader.result)
+        }
+        reader.readAsDataURL(file)
+      }
     }
   }
 

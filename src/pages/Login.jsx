@@ -7,6 +7,7 @@ export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [error, setError] = useState('')
@@ -38,6 +39,12 @@ export default function Login() {
 
     if (isSignUp && (!firstName.trim() || !lastName.trim())) {
       setError('First name and last name are required')
+      setLoading(false)
+      return
+    }
+
+    if (isSignUp && password !== confirmPassword) {
+      setError('Passwords do not match')
       setLoading(false)
       return
     }
@@ -88,7 +95,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (
-              <>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium mb-2">
                     First Name
@@ -118,7 +125,7 @@ export default function Login() {
                     required
                   />
                 </div>
-              </>
+              </div>
             )}
 
             <div>
@@ -155,6 +162,24 @@ export default function Login() {
               />
             </div>
 
+            {isSignUp && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2">
+                  Confirm Password
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -171,6 +196,7 @@ export default function Login() {
                 setError('')
                 setFirstName('')
                 setLastName('')
+                setConfirmPassword('')
               }}
               className="text-sm text-primary hover:underline"
             >

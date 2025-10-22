@@ -12,10 +12,10 @@ RETURNS user_role AS $$
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- Users table policies
--- Only admins can view all users
-CREATE POLICY "Admins can view all users"
+-- Admins and coordinators can view all users
+CREATE POLICY "Admins and coordinators can view all users"
   ON users FOR SELECT
-  USING (get_user_role() = 'admin');
+  USING (get_user_role() IN ('admin', 'coordinator'));
 
 -- Users can view their own record
 CREATE POLICY "Users can view own record"
@@ -41,25 +41,25 @@ CREATE POLICY "Authenticated users can view locations"
     AND get_user_role() != 'pending'
   );
 
--- Admins and editors can create locations
-CREATE POLICY "Admins and editors can create locations"
+-- Admins, coordinators, and editors can create locations
+CREATE POLICY "Admins, coordinators, and editors can create locations"
   ON locations FOR INSERT
   WITH CHECK (
-    get_user_role() IN ('admin', 'editor')
+    get_user_role() IN ('admin', 'coordinator', 'editor')
   );
 
--- Admins and editors can update locations
-CREATE POLICY "Admins and editors can update locations"
+-- Admins, coordinators, and editors can update locations
+CREATE POLICY "Admins, coordinators, and editors can update locations"
   ON locations FOR UPDATE
   USING (
-    get_user_role() IN ('admin', 'editor')
+    get_user_role() IN ('admin', 'coordinator', 'editor')
   );
 
--- Admins and editors can delete locations
-CREATE POLICY "Admins and editors can delete locations"
+-- Admins, coordinators, and editors can delete locations
+CREATE POLICY "Admins, coordinators, and editors can delete locations"
   ON locations FOR DELETE
   USING (
-    get_user_role() IN ('admin', 'editor')
+    get_user_role() IN ('admin', 'coordinator', 'editor')
   );
 
 -- Categories table policies
@@ -71,18 +71,18 @@ CREATE POLICY "Authenticated users can view categories"
     AND get_user_role() != 'pending'
   );
 
--- Admins can manage categories
-CREATE POLICY "Admins can create categories"
+-- Admins and coordinators can manage categories
+CREATE POLICY "Admins and coordinators can create categories"
   ON categories FOR INSERT
-  WITH CHECK (get_user_role() = 'admin');
+  WITH CHECK (get_user_role() IN ('admin', 'coordinator'));
 
-CREATE POLICY "Admins can update categories"
+CREATE POLICY "Admins and coordinators can update categories"
   ON categories FOR UPDATE
-  USING (get_user_role() = 'admin');
+  USING (get_user_role() IN ('admin', 'coordinator'));
 
-CREATE POLICY "Admins can delete categories"
+CREATE POLICY "Admins and coordinators can delete categories"
   ON categories FOR DELETE
-  USING (get_user_role() = 'admin');
+  USING (get_user_role() IN ('admin', 'coordinator'));
 
 -- Items table policies
 -- All authenticated non-pending users can view items
@@ -93,25 +93,25 @@ CREATE POLICY "Authenticated users can view items"
     AND get_user_role() != 'pending'
   );
 
--- Admins and editors can create items
-CREATE POLICY "Admins and editors can create items"
+-- Admins, coordinators, and editors can create items
+CREATE POLICY "Admins, coordinators, and editors can create items"
   ON items FOR INSERT
   WITH CHECK (
-    get_user_role() IN ('admin', 'editor')
+    get_user_role() IN ('admin', 'coordinator', 'editor')
   );
 
--- Admins and editors can update items
-CREATE POLICY "Admins and editors can update items"
+-- Admins, coordinators, and editors can update items
+CREATE POLICY "Admins, coordinators, and editors can update items"
   ON items FOR UPDATE
   USING (
-    get_user_role() IN ('admin', 'editor')
+    get_user_role() IN ('admin', 'coordinator', 'editor')
   );
 
--- Admins and editors can delete items
-CREATE POLICY "Admins and editors can delete items"
+-- Admins, coordinators, and editors can delete items
+CREATE POLICY "Admins, coordinators, and editors can delete items"
   ON items FOR DELETE
   USING (
-    get_user_role() IN ('admin', 'editor')
+    get_user_role() IN ('admin', 'coordinator', 'editor')
   );
 
 -- Item logs table policies

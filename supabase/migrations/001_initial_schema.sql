@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create enums
-CREATE TYPE user_role AS ENUM ('admin', 'editor', 'viewer', 'pending');
+CREATE TYPE user_role AS ENUM ('admin', 'coordinator', 'editor', 'viewer', 'pending');
 CREATE TYPE log_action AS ENUM ('create', 'update', 'check_out', 'check_in', 'delete');
 
 -- Users table (extends Supabase auth.users)

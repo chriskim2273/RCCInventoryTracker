@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus } from 'lucide-react'
+import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 import RoleChangeConfirmationModal from '@/components/RoleChangeConfirmationModal'
 import { useAuth } from '@/contexts/AuthContext'
+import { getUserDetails, deleteUser, resendConfirmationEmail, resetUserPassword } from '@/lib/adminApi'
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('users')
@@ -202,11 +203,19 @@ export default function AdminPanel() {
 
     try {
       if (activeTab === 'users') {
-        const { data } = await supabase
-          .from('users')
-          .select('*, first_name, last_name')
-          .order('created_at', { ascending: false })
-        setUsers(data || [])
+        // Use the admin API to get detailed user information including auth status
+        try {
+          const { users: detailedUsers } = await getUserDetails()
+          setUsers(detailedUsers || [])
+        } catch (error) {
+          console.error('Error fetching user details:', error)
+          // Fallback to basic user data if admin API fails
+          const { data } = await supabase
+            .from('users')
+            .select('*, first_name, last_name')
+            .order('created_at', { ascending: false })
+          setUsers(data || [])
+        }
       } else if (activeTab === 'items') {
         const { data } = await supabase
           .from('items')
@@ -338,6 +347,47 @@ export default function AdminPanel() {
     }
   }
 
+  // Admin API handlers
+  const handleDeleteUser = async (userId, userEmail) => {
+    if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      await deleteUser(userId)
+      alert('User deleted successfully')
+      await fetchData()
+    } catch (error) {
+      alert(`Failed to delete user: ${error.message}`)
+    }
+  }
+
+  const handleResendConfirmation = async (email) => {
+    try {
+      await resendConfirmationEmail(email)
+      alert(`Confirmation email resent to ${email}`)
+    } catch (error) {
+      alert(`Failed to resend confirmation: ${error.message}`)
+    }
+  }
+
+  const handleResetPassword = async (userId, userEmail) => {
+    const newPassword = prompt(`Enter new password for ${userEmail}:`)
+    if (!newPassword) return
+
+    if (newPassword.length < 6) {
+      alert('Password must be at least 6 characters long')
+      return
+    }
+
+    try {
+      await resetUserPassword(userId, newPassword)
+      alert('Password reset successfully')
+    } catch (error) {
+      alert(`Failed to reset password: ${error.message}`)
+    }
+  }
+
   const prepareDeleteItem = async (itemId, itemName) => {
     setDeleteModalData({
       type: 'item',
@@ -421,7 +471,7 @@ export default function AdminPanel() {
   }
 
   const confirmDelete = async () => {
-    const { type, id } = deleteModalData
+    const { type, id, name, affectedData } = deleteModalData
 
     if (type === 'item') {
       const { error } = await supabase
@@ -436,6 +486,13 @@ export default function AdminPanel() {
         fetchData()
       }
     } else if (type === 'location') {
+      // Get the location details for logging
+      const { data: locationData } = await supabase
+        .from('locations')
+        .select('name, path')
+        .eq('id', id)
+        .single()
+
       const { error } = await supabase
         .from('locations')
         .update({
@@ -445,6 +502,18 @@ export default function AdminPanel() {
         .eq('id', id)
 
       if (!error) {
+        // Log to admin audit logs
+        await supabase.from('audit_logs').insert({
+          user_id: currentUser?.id,
+          action: 'delete_location',
+          details: {
+            location_name: locationData?.name || name,
+            location_path: locationData?.path,
+            child_locations_count: affectedData?.childLocations?.length || 0,
+            affected_items_count: affectedData?.items?.length || 0,
+          },
+        })
+
         fetchData()
       }
     } else if (type === 'category') {
@@ -476,6 +545,13 @@ export default function AdminPanel() {
   const restoreItem = async (itemId) => {
     if (!confirm('Are you sure you want to restore this item?')) return
 
+    // Get the item details for logging
+    const { data: itemData } = await supabase
+      .from('items')
+      .select('name, serial_number')
+      .eq('id', itemId)
+      .single()
+
     const { error } = await supabase
       .from('items')
       .update({
@@ -485,12 +561,29 @@ export default function AdminPanel() {
       .eq('id', itemId)
 
     if (!error) {
+      // Log to admin audit logs
+      await supabase.from('audit_logs').insert({
+        user_id: currentUser?.id,
+        action: 'restore_item',
+        details: {
+          item_name: itemData?.name,
+          item_serial_number: itemData?.serial_number,
+        },
+      })
+
       fetchData()
     }
   }
 
   const restoreLocation = async (locationId) => {
     if (!confirm('Are you sure you want to restore this location?')) return
+
+    // Get the location details for logging
+    const { data: locationData } = await supabase
+      .from('locations')
+      .select('name, path')
+      .eq('id', locationId)
+      .single()
 
     const { error } = await supabase
       .from('locations')
@@ -501,12 +594,29 @@ export default function AdminPanel() {
       .eq('id', locationId)
 
     if (!error) {
+      // Log to admin audit logs
+      await supabase.from('audit_logs').insert({
+        user_id: currentUser?.id,
+        action: 'restore_location',
+        details: {
+          location_name: locationData?.name,
+          location_path: locationData?.path,
+        },
+      })
+
       fetchData()
     }
   }
 
   const restoreCategory = async (categoryId) => {
     if (!confirm('Are you sure you want to restore this category?')) return
+
+    // Get the category details for logging
+    const { data: categoryData } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('id', categoryId)
+      .single()
 
     const { error } = await supabase
       .from('categories')
@@ -517,6 +627,15 @@ export default function AdminPanel() {
       .eq('id', categoryId)
 
     if (!error) {
+      // Log to admin audit logs
+      await supabase.from('audit_logs').insert({
+        user_id: currentUser?.id,
+        action: 'restore_category',
+        details: {
+          category_name: categoryData?.name,
+        },
+      })
+
       fetchData()
     }
   }
@@ -618,67 +737,126 @@ export default function AdminPanel() {
         <>
           {activeTab === 'users' && (
             <div className="bg-card border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Current Role</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Created At</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">
-                        {user.first_name && user.last_name
-                          ? `${user.first_name} ${user.last_name}`
-                          : 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
-                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                              : user.role === 'coordinator'
-                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
-                                : user.role === 'editor'
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                  : user.role === 'viewer'
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                            }`}
-                        >
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        {canManageUsers ? (
-                          <select
-                            value={user.role}
-                            onChange={(e) => prepareRoleChange(user, e.target.value)}
-                            className="text-sm border rounded px-2 py-1 bg-background"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="viewer">Viewer</option>
-                            <option value="editor">Editor</option>
-                            <option value="coordinator">Coordinator</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            No permission - Contact an Admin
-                          </span>
-                        )}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Role</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Last Sign In</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Change Role</th>
+                      {canManageUsers && (
+                        <th className="px-4 py-3 text-left text-sm font-medium">Admin Actions</th>
+                      )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y">
+                    {users.map((user) => (
+                      <tr key={user.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-medium">
+                          {user.first_name && user.last_name
+                            ? `${user.first_name} ${user.last_name}`
+                            : 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {user.confirmed ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                <CheckCircle className="h-3 w-3" />
+                                Verified
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                <XCircle className="h-3 w-3" />
+                                Unverified
+                              </span>
+                            )}
+                            {user.banned && (
+                              <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                Banned
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                : user.role === 'coordinator'
+                                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+                                  : user.role === 'editor'
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                    : user.role === 'viewer'
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                              }`}
+                          >
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                          {user.last_sign_in_at
+                            ? new Date(user.last_sign_in_at).toLocaleDateString()
+                            : 'Never'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {canManageUsers ? (
+                            <select
+                              value={user.role}
+                              onChange={(e) => prepareRoleChange(user, e.target.value)}
+                              className="text-sm border rounded px-2 py-1 bg-background"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="viewer">Viewer</option>
+                              <option value="editor">Editor</option>
+                              <option value="coordinator">Coordinator</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              No permission
+                            </span>
+                          )}
+                        </td>
+                        {canManageUsers && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {!user.confirmed && (
+                                <button
+                                  onClick={() => handleResendConfirmation(user.email)}
+                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                  title="Resend confirmation email"
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleResetPassword(user.id, user.email)}
+                                className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
+                                title="Reset password"
+                              >
+                                <Key className="h-4 w-4" />
+                              </button>
+                              {user.id !== currentUser.id && (
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.email)}
+                                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                  title="Delete user"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -1075,7 +1253,14 @@ export default function AdminPanel() {
                       className="w-full px-3 py-2 border rounded-md bg-background"
                     >
                       <option value="all">All Actions</option>
+                      <option value="delete_user">Delete User</option>
+                      <option value="resend_confirmation">Resend Confirmation</option>
+                      <option value="reset_password">Reset Password</option>
+                      <option value="update_email">Update Email</option>
                       <option value="delete_location">Delete Location</option>
+                      <option value="restore_location">Restore Location</option>
+                      <option value="restore_item">Restore Item</option>
+                      <option value="restore_category">Restore Category</option>
                       <option value="bulk_delete">Bulk Delete</option>
                     </select>
                   </div>
@@ -1145,15 +1330,42 @@ export default function AdminPanel() {
                           <div>
                             <h3 className="font-semibold text-lg">
                               {log.action === 'delete_location' && 'Location Deletion'}
+                              {log.action === 'restore_location' && 'Location Restored'}
+                              {log.action === 'restore_item' && 'Item Restored'}
+                              {log.action === 'restore_category' && 'Category Restored'}
                               {log.action === 'bulk_delete' && 'Bulk Deletion'}
-                              {!log.action.includes('delete') && log.action.replace('_', ' ').toUpperCase()}
+                              {log.action === 'delete_user' && 'User Deletion'}
+                              {log.action === 'resend_confirmation' && 'Resend Confirmation Email'}
+                              {log.action.includes('reset_password') && 'Password Reset'}
+                              {log.action.includes('update_email') && 'Email Update'}
+                              {!['delete_location', 'restore_location', 'restore_item', 'restore_category', 'bulk_delete', 'delete_user', 'resend_confirmation'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              {new Date(log.created_at).toLocaleString()} • {getUserDisplayName(log.user)}
+                              {new Date(log.created_at).toLocaleString()}
                             </p>
+                            <p className="text-sm font-medium mt-1">
+                              Admin: {getUserDisplayName(log.user)}
+                            </p>
+                            {log.details?.email && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Target: {log.details.email}
+                              </p>
+                            )}
+                            {(log.details?.item_name || log.details?.location_name || log.details?.category_name) && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {log.details?.item_name && `Item: ${log.details.item_name}`}
+                                {log.details?.location_name && `Location: ${log.details.location_name}`}
+                                {log.details?.category_name && `Category: ${log.details.category_name}`}
+                                {log.details?.item_serial_number && ` (SN: ${log.details.item_serial_number})`}
+                              </p>
+                            )}
                           </div>
                         </div>
-                        <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                          log.action.startsWith('restore_')
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
                           {log.action.replace('_', ' ').toUpperCase()}
                         </span>
                       </div>

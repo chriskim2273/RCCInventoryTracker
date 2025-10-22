@@ -55,7 +55,45 @@ VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 ```
 
-## 5. Create First Admin User
+## 5. Deploy Edge Functions (Required for Admin Features)
+
+Edge Functions provide admin capabilities like deleting users, resending confirmation emails, and resetting passwords.
+
+### Quick Setup
+
+1. **Install Supabase CLI** (if not already installed):
+   ```bash
+   npm install -g supabase
+   ```
+
+2. **Link to your project**:
+   ```bash
+   supabase link --project-ref YOUR_PROJECT_REF
+   ```
+   (Find your project ref in Settings > General > Reference ID)
+
+3. **Set the service role key as a secret**:
+   ```bash
+   supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   ```
+   (Get your service role key from Settings > API)
+
+4. **Deploy all functions**:
+   ```bash
+   supabase functions deploy
+   ```
+
+### Verify Deployment
+
+The following admin functions should now be available:
+- `delete-user` - Delete users from the system
+- `resend-confirmation` - Resend email confirmation
+- `get-user-details` - Get detailed user info with auth status
+- `update-user-metadata` - Update user email, password, or ban status
+
+For detailed setup instructions and troubleshooting, see [`functions/README.md`](./functions/README.md).
+
+## 6. Create First Admin User
 
 After running the migrations:
 
@@ -69,7 +107,7 @@ SET role = 'admin'
 WHERE email = 'your-email@company.com';
 ```
 
-## 6. Configure Email (SMTP)
+## 7. Configure Email (SMTP)
 
 ### Using Google SMTP with Supabase
 
@@ -113,7 +151,7 @@ If it succeeds, your Supabase project is now ready to send authentication and ma
 - Use this setup for development or low-volume apps.
 - For production, consider Mailgun, SendGrid, or Brevo.
 
-## 7. Seed Initial Data (Optional)
+## 8. Seed Initial Data (Optional)
 
 Create some initial categories:
 
