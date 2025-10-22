@@ -31,8 +31,8 @@
     --accent-foreground: 0 0% 100%;
     --destructive: 358 74% 48%;      /* SBU Bright Red */
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
+    --border: 0 0% 80%;
+    --input: 0 0% 80%;
     --ring: 0 100% 30%;              /* SBU Red */
     --radius: 0.5rem;
   }
