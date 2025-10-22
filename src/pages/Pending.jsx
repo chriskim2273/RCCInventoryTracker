@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext'
-import { Clock, Package } from 'lucide-react'
+import { Clock } from 'lucide-react'
+import sbuLogo from '@/assets/SBU_LOGO.jpeg'
 
 export default function Pending() {
   const { signOut, user } = useAuth()
@@ -12,9 +13,13 @@ export default function Pending() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="bg-card border rounded-lg shadow-lg p-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <Package className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">Inventory Tracker</h1>
+          <div className="flex flex-col items-center justify-center mb-8">
+            <img
+              src={sbuLogo}
+              alt="Stony Brook University"
+              className="h-20 w-20 object-contain mb-3"
+            />
+            <h1 className="text-xl font-bold">RCC Inventory Tracker</h1>
           </div>
 
           <div className="flex justify-center mb-6">

@@ -4,48 +4,59 @@
 
 @layer base {
   :root {
+    /* Stony Brook University Brand Colors */
+    --sbu-red: 0 100% 30%;           /* #990000 */
+    --sbu-black: 0 0% 0%;            /* #000000 */
+    --sbu-dark-red: 357 100% 21%;    /* #6B000D */
+    --sbu-navy: 207 100% 13.3%;      /* #002244 */
+    --sbu-bright-red: 358 74% 48%;   /* #D52027 */
+    --sbu-royal-blue: 203 100% 30%;  /* #00549A */
+    --sbu-dark-gray: 0 0% 29.4%;     /* #4B4B4B */
+    --sbu-turquoise: 191 77% 38%;    /* #1791AD */
+    --sbu-light-gray: 0 0% 74.5%;    /* #BEBEBE */
+
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 0%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 0%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 0 100% 30%;           /* SBU Red */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 203 100% 30%;       /* SBU Royal Blue */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 29.4%;  /* SBU Dark Gray */
+    --accent: 191 77% 38%;           /* SBU Turquoise */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 358 74% 48%;      /* SBU Bright Red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 100% 30%;              /* SBU Red */
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 0 0% 0%;           /* SBU Black */
+    --foreground: 0 0% 100%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 0%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 358 74% 48%;          /* SBU Bright Red */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 207 100% 13.3%;     /* SBU Navy */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 74.5%;  /* SBU Light Gray */
+    --accent: 191 77% 38%;           /* SBU Turquoise */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 358 74% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 358 74% 48%;
   }
 }
 
@@ -55,5 +66,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 }

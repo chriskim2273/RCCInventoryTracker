@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { Package } from 'lucide-react'
+import sbuLogo from '@/assets/SBU_LOGO.jpeg'
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -59,9 +59,13 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="bg-card border rounded-lg shadow-lg p-8">
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <Package className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">Inventory Tracker</h1>
+          <div className="flex flex-col items-center justify-center mb-8">
+            <img
+              src={sbuLogo}
+              alt="Stony Brook University"
+              className="h-20 w-20 object-contain mb-3"
+            />
+            <h1 className="text-xl font-bold">RCC Inventory Tracker</h1>
           </div>
 
           <h2 className="text-xl font-semibold mb-6 text-center">
