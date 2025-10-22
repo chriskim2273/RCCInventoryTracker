@@ -65,6 +65,40 @@ export default function LocationExplorer() {
     setBreadcrumbs(breadcrumbArray)
   }
 
+  // Recursively get all sublocation IDs for a given location
+  const getAllSublocationIds = async (locationId) => {
+    const allIds = [locationId]
+    const queue = [locationId]
+
+    // Fetch all locations once
+    const { data: allLocations } = await supabase
+      .from('locations')
+      .select('id, parent_id')
+      .is('deleted_at', null)
+
+    const locationMap = {}
+    allLocations.forEach(loc => {
+      if (!locationMap[loc.parent_id]) {
+        locationMap[loc.parent_id] = []
+      }
+      locationMap[loc.parent_id].push(loc.id)
+    })
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      const children = locationMap[currentId] || []
+
+      for (const childId of children) {
+        if (!allIds.includes(childId)) {
+          allIds.push(childId)
+          queue.push(childId)
+        }
+      }
+    }
+
+    return allIds
+  }
+
   const fetchLocationData = async () => {
     setLoading(true)
 
@@ -100,16 +134,23 @@ export default function LocationExplorer() {
 
       setChildLocations(children || [])
 
+      // Get all sublocation IDs to include items from sublocations
+      let locationIdsToQuery = []
+      if (locationId) {
+        locationIdsToQuery = await getAllSublocationIds(locationId)
+      }
+
       let itemsQuery = supabase
         .from('items')
         .select(`
           *,
-          category:categories(name, icon)
+          category:categories(name, icon),
+          location:locations(name, path)
         `)
         .is('deleted_at', null)
 
       if (locationId) {
-        itemsQuery = itemsQuery.eq('location_id', locationId)
+        itemsQuery = itemsQuery.in('location_id', locationIdsToQuery)
       } else {
         itemsQuery = itemsQuery.is('location_id', null)
       }
@@ -469,7 +510,9 @@ export default function LocationExplorer() {
 
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
-              <h2 className="text-lg sm:text-xl font-semibold">Items at this Location</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">
+                {locationId ? 'Items at this Location and Sublocations' : 'Items at this Location'}
+              </h2>
               {canEdit && (
                 <button
                   onClick={() => setShowItemModal(true)}
@@ -515,6 +558,11 @@ export default function LocationExplorer() {
                           {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
                           {item.category?.name || 'Uncategorized'}
                         </p>
+                        {item.location?.path && item.location_id !== locationId && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate" title={item.location.path}>
+                            📍 {item.location.path}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
