@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Modal from './Modal'
+import { Upload, X } from 'lucide-react'
 
 export default function LocationModal({ isOpen, onClose, onSuccess, location = null, parentId = null }) {
   const [formData, setFormData] = useState({
     name: '',
     parent_id: parentId || '',
+    description: '',
   })
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -18,13 +22,18 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
         setFormData({
           name: location.name || '',
           parent_id: location.parent_id || '',
+          description: location.description || '',
         })
+        setImagePreview(location.image_url || null)
       } else {
         setFormData({
           name: '',
           parent_id: parentId || '',
+          description: '',
         })
+        setImagePreview(null)
       }
+      setImageFile(null)
       setError(null)
     }
   }, [isOpen, location, parentId])
@@ -45,15 +54,53 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
     setLocations(filteredLocations)
   }
 
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
     try {
+      let imageUrl = location?.image_url || null
+
+      // Upload image if new file selected
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop()
+        const fileName = `${Math.random()}.${fileExt}`
+        const { error: uploadError, data } = await supabase.storage
+          .from('item-images')
+          .upload(fileName, imageFile)
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('item-images')
+          .getPublicUrl(fileName)
+
+        imageUrl = publicUrl
+      }
+
       const locationData = {
         name: formData.name,
         parent_id: formData.parent_id || null,
+        description: formData.description || null,
+        image_url: imageUrl,
       }
 
       if (location) {
@@ -105,6 +152,17 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
         </div>
 
         <div>
+          <label className="block text-sm font-medium mb-1">Description</label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className="w-full px-3 py-2 border rounded-md bg-background resize-none"
+            placeholder="Optional description of this location"
+            rows={3}
+          />
+        </div>
+
+        <div>
           <label className="block text-sm font-medium mb-1">Parent Location</label>
           <select
             value={formData.parent_id}
@@ -121,6 +179,39 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
           <p className="text-xs text-muted-foreground mt-1">
             Leave empty to create a top-level location
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Location Image</label>
+          <div className="mt-2">
+            {imagePreview ? (
+              <div className="relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="h-32 w-32 object-cover rounded-md border"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 hover:bg-destructive/90"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-md cursor-pointer hover:border-primary transition-colors">
+                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                <span className="text-xs text-muted-foreground">Upload Image</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-4">

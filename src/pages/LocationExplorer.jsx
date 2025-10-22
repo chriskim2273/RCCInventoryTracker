@@ -269,6 +269,20 @@ export default function LocationExplorer() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {currentLocation?.image_url && (
+        <div className="relative w-full h-48 sm:h-64 rounded-xl overflow-hidden shadow-lg mb-6">
+          <img
+            src={currentLocation.image_url}
+            alt={currentLocation.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.target.parentElement.style.display = 'none'
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground mb-2 overflow-x-auto pb-1">
@@ -285,6 +299,11 @@ export default function LocationExplorer() {
           <h1 className="text-2xl sm:text-3xl font-bold truncate">
             {currentLocation?.name || 'All Locations'}
           </h1>
+          {currentLocation?.description && (
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
+              {currentLocation.description}
+            </p>
+          )}
         </div>
 
         {canEdit && (
@@ -343,8 +362,22 @@ export default function LocationExplorer() {
                       to={`/locations/${location.id}`}
                       className="block bg-card border rounded-lg p-4 sm:p-6 hover:border-primary transition-colors"
                     >
-                      <h3 className="font-semibold text-base pr-16 sm:pr-0">{location.name}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">{location.path}</p>
+                      {location.image_url && (
+                        <div className="mb-3">
+                          <img
+                            src={location.image_url}
+                            alt={location.name}
+                            className="w-full h-32 object-cover rounded-md border"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                      <h3 className="font-semibold text-lg sm:text-xl pr-16 sm:pr-0">{location.name}</h3>
+                      {location.description && (
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">{location.description}</p>
+                      )}
                     </Link>
                     {canEdit && (
                       <div className="absolute top-2 right-2 flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
@@ -445,14 +478,14 @@ export default function LocationExplorer() {
                         <div className="flex items-center gap-0.5 sm:gap-1">
                           <button
                             onClick={(e) => handleQuantityChange(item.id, -1, e)}
-                            className="p-1.5 hover:bg-secondary rounded-md transition-colors"
+                            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 rounded-md transition-colors"
                             title="Decrease quantity"
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={(e) => handleQuantityChange(item.id, 1, e)}
-                            className="p-1.5 hover:bg-secondary rounded-md transition-colors"
+                            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 rounded-md transition-colors"
                             title="Increase quantity"
                           >
                             <Plus className="h-3.5 w-3.5" />
