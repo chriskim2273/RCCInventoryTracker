@@ -508,109 +508,109 @@ export default function LocationExplorer() {
             </div>
           )}
 
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
-              <h2 className="text-lg sm:text-xl font-semibold">
-                {locationId ? 'Items at this Location and Sublocations' : 'Items at this Location'}
-              </h2>
-              {canEdit && (
-                <button
-                  onClick={() => setShowItemModal(true)}
-                  className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Item
-                </button>
-              )}
-            </div>
-
-            {items.length === 0 ? (
-              <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
-                No items at this location
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {items.map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/items/${item.id}`}
-                    className="bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative"
+          {locationId && (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
+                <h2 className="text-lg sm:text-xl font-semibold">Items at this Location and Sublocations</h2>
+                {canEdit && (
+                  <button
+                    onClick={() => setShowItemModal(true)}
+                    className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
                   >
-                    {item.image_url && (
-                      <div className="mb-3">
-                        <img
-                          src={item.image_url}
-                          alt={item.name}
-                          className="w-full h-32 object-cover rounded-md border"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                          }}
-                        />
-                      </div>
-                    )}
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base truncate">{item.name}</h3>
-                        {item.serial_number && (
-                          <p className="text-xs text-muted-foreground truncate">SN: {item.serial_number}</p>
-                        )}
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
-                          {item.category?.name || 'Uncategorized'}
-                        </p>
-                        {item.location?.path && item.location_id !== locationId && (
-                          <p className="text-xs text-muted-foreground mt-1 truncate" title={item.location.path}>
-                            📍 {item.location.path}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      {editingItemId === item.id ? (
-                        <input
-                          type="number"
-                          min="0"
-                          value={quantityInput}
-                          onChange={(e) => setQuantityInput(e.target.value)}
-                          onBlur={(e) => saveQuantity(item.id, e)}
-                          onKeyDown={(e) => handleQuantityKeyDown(item.id, e)}
-                          onClick={(e) => e.stopPropagation()}
-                          autoFocus
-                          className="text-sm font-medium w-20 px-2 py-1 border rounded-md bg-background"
-                        />
-                      ) : (
-                        <span
-                          onClick={(e) => canEdit ? startEditingQuantity(item, e) : null}
-                          className={`text-xs sm:text-sm font-medium ${canEdit ? 'cursor-pointer hover:text-primary transition-colors' : 'text-muted-foreground'}`}
-                          title={canEdit ? 'Click to edit quantity' : ''}
-                        >
-                          Qty: {item.quantity}
-                        </span>
-                      )}
-                      {canEdit && editingItemId !== item.id && (
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <button
-                            onClick={(e) => handleQuantityChange(item.id, -1, e)}
-                            className="p-2 sm:p-2.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 border border-red-300 dark:border-red-800 rounded-md transition-colors"
-                            title="Decrease quantity"
-                          >
-                            <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
-                          </button>
-                          <button
-                            onClick={(e) => handleQuantityChange(item.id, 1, e)}
-                            className="p-2 sm:p-2.5 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-300 border border-green-300 dark:border-green-800 rounded-md transition-colors"
-                            title="Increase quantity"
-                          >
-                            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-                          </button>
+                    <Plus className="h-4 w-4" />
+                    Add Item
+                  </button>
+                )}
+              </div>
+
+              {items.length === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
+                  No items at this location
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  {items.map((item) => (
+                    <Link
+                      key={item.id}
+                      to={`/items/${item.id}`}
+                      className="bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative"
+                    >
+                      {item.image_url && (
+                        <div className="mb-3">
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="w-full h-32 object-cover rounded-md border"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
                         </div>
                       )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-base truncate">{item.name}</h3>
+                          {item.serial_number && (
+                            <p className="text-xs text-muted-foreground truncate">SN: {item.serial_number}</p>
+                          )}
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
+                            {item.category?.name || 'Uncategorized'}
+                          </p>
+                          {item.location?.path && item.location_id !== locationId && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate" title={item.location.path}>
+                              📍 {item.location.path}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        {editingItemId === item.id ? (
+                          <input
+                            type="number"
+                            min="0"
+                            value={quantityInput}
+                            onChange={(e) => setQuantityInput(e.target.value)}
+                            onBlur={(e) => saveQuantity(item.id, e)}
+                            onKeyDown={(e) => handleQuantityKeyDown(item.id, e)}
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                            className="text-sm font-medium w-20 px-2 py-1 border rounded-md bg-background"
+                          />
+                        ) : (
+                          <span
+                            onClick={(e) => canEdit ? startEditingQuantity(item, e) : null}
+                            className={`text-xs sm:text-sm font-medium ${canEdit ? 'cursor-pointer hover:text-primary transition-colors' : 'text-muted-foreground'}`}
+                            title={canEdit ? 'Click to edit quantity' : ''}
+                          >
+                            Qty: {item.quantity}
+                          </span>
+                        )}
+                        {canEdit && editingItemId !== item.id && (
+                          <div className="flex items-center gap-1 sm:gap-2">
+                            <button
+                              onClick={(e) => handleQuantityChange(item.id, -1, e)}
+                              className="p-2 sm:p-2.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 border border-red-300 dark:border-red-800 rounded-md transition-colors"
+                              title="Decrease quantity"
+                            >
+                              <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
+                            </button>
+                            <button
+                              onClick={(e) => handleQuantityChange(item.id, 1, e)}
+                              className="p-2 sm:p-2.5 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-300 border border-green-300 dark:border-green-800 rounded-md transition-colors"
+                              title="Increase quantity"
+                            >
+                              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
