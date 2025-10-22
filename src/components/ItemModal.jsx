@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
-import { Upload, X } from 'lucide-react'
+import { Upload, X, AlertTriangle } from 'lucide-react'
 import imageCompression from 'browser-image-compression'
 
 export default function ItemModal({ isOpen, onClose, onSuccess, item = null, locationId = null }) {
@@ -23,6 +23,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [duplicateWarning, setDuplicateWarning] = useState(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -54,8 +55,48 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
       }
       setImageFile(null)
       setError(null)
+      setDuplicateWarning(null)
     }
   }, [isOpen, item, locationId])
+
+  // Check for duplicate names in the same location
+  useEffect(() => {
+    const checkDuplicate = async () => {
+      if (!formData.name || !formData.location_id) {
+        setDuplicateWarning(null)
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('items')
+          .select('id, name, serial_number')
+          .eq('name', formData.name)
+          .eq('location_id', formData.location_id)
+          .is('deleted_at', null)
+
+        if (error) throw error
+
+        // Filter out the current item if we're editing
+        const duplicates = data?.filter(d => d.id !== item?.id) || []
+
+        if (duplicates.length > 0) {
+          setDuplicateWarning({
+            count: duplicates.length,
+            items: duplicates
+          })
+        } else {
+          setDuplicateWarning(null)
+        }
+      } catch (err) {
+        console.error('Error checking for duplicates:', err)
+      }
+    }
+
+    // Debounce the check
+    const timer = setTimeout(checkDuplicate, 500)
+    return () => clearTimeout(timer)
+  }, [formData.name, formData.location_id, item?.id])
 
   const fetchOptions = async () => {
     const [categoriesRes, locationsRes] = await Promise.all([
@@ -186,6 +227,30 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         {error && (
           <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md text-sm">
             {error}
+          </div>
+        )}
+
+        {duplicateWarning && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200 px-4 py-3 rounded-md text-sm">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Duplicate Name Warning</p>
+                <p className="mt-1">
+                  {duplicateWarning.count} other item{duplicateWarning.count > 1 ? 's' : ''} with the name "{formData.name}" already exist{duplicateWarning.count === 1 ? 's' : ''} in this location:
+                </p>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {duplicateWarning.items.map((item, idx) => (
+                    <li key={item.id} className="ml-4">
+                      • {item.name}{item.serial_number ? ` (SN: ${item.serial_number})` : ''}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs">
+                  You can still proceed, but consider using a unique serial number or different name to distinguish this item.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 

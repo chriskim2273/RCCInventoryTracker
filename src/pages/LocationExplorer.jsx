@@ -446,6 +446,9 @@ export default function LocationExplorer() {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-base truncate">{item.name}</h3>
+                        {item.serial_number && (
+                          <p className="text-xs text-muted-foreground truncate">SN: {item.serial_number}</p>
+                        )}
                         <p className="text-xs sm:text-sm text-muted-foreground">
                           {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
                           {item.category?.name || 'Uncategorized'}
@@ -475,20 +478,20 @@ export default function LocationExplorer() {
                         </span>
                       )}
                       {canEdit && editingItemId !== item.id && (
-                        <div className="flex items-center gap-0.5 sm:gap-1">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <button
                             onClick={(e) => handleQuantityChange(item.id, -1, e)}
-                            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 rounded-md transition-colors"
+                            className="p-2 sm:p-2.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 border border-red-300 dark:border-red-800 rounded-md transition-colors"
                             title="Decrease quantity"
                           >
-                            <Minus className="h-3.5 w-3.5" />
+                            <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
                           </button>
                           <button
                             onClick={(e) => handleQuantityChange(item.id, 1, e)}
-                            className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 rounded-md transition-colors"
+                            className="p-2 sm:p-2.5 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-300 border border-green-300 dark:border-green-800 rounded-md transition-colors"
                             title="Increase quantity"
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                           </button>
                         </div>
                       )}

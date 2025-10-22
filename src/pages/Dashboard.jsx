@@ -166,6 +166,9 @@ export default function Dashboard() {
                     >
                       {item.name}
                     </Link>
+                    {item.serial_number && (
+                      <p className="text-xs text-muted-foreground truncate">SN: {item.serial_number}</p>
+                    )}
                     <p className="text-xs sm:text-sm text-muted-foreground truncate">
                       {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
                       {item.category?.name || 'Uncategorized'} • {item.location?.name || 'Unknown location'}

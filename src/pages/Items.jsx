@@ -279,6 +279,9 @@ export default function Items() {
                         {item.brand && (
                           <p className="text-sm text-muted-foreground mt-0.5">{item.brand}</p>
                         )}
+                        {item.serial_number && (
+                          <p className="text-xs text-muted-foreground mt-0.5">SN: {item.serial_number}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -358,15 +361,20 @@ export default function Items() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          to={`/items/${item.id}`}
-                          className="text-primary hover:underline font-medium"
-                        >
-                          {item.name}
-                        </Link>
-                        {item.brand && (
-                          <span className="text-sm text-muted-foreground ml-2">({item.brand})</span>
-                        )}
+                        <div>
+                          <Link
+                            to={`/items/${item.id}`}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {item.name}
+                          </Link>
+                          {item.brand && (
+                            <span className="text-sm text-muted-foreground ml-2">({item.brand})</span>
+                          )}
+                          {item.serial_number && (
+                            <div className="text-xs text-muted-foreground mt-0.5">SN: {item.serial_number}</div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 text-sm">

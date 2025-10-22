@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle } from 'lucide-react'
+import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
@@ -20,6 +20,7 @@ export default function AdminPanel() {
   const [deletedItems, setDeletedItems] = useState([])
   const [deletedLocations, setDeletedLocations] = useState([])
   const [deletedCategories, setDeletedCategories] = useState([])
+  const [checkoutHistory, setCheckoutHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
@@ -52,6 +53,10 @@ export default function AdminPanel() {
   const [deletedSearchQuery, setDeletedSearchQuery] = useState('')
   const [deletedTypeFilter, setDeletedTypeFilter] = useState('all')
   const [deletedUserFilter, setDeletedUserFilter] = useState('all')
+
+  const [checkoutSearchQuery, setCheckoutSearchQuery] = useState('')
+  const [checkoutStatusFilter, setCheckoutStatusFilter] = useState('all')
+  const [checkoutPerformedByFilter, setCheckoutPerformedByFilter] = useState('all')
 
   const formatValue = (value) => {
     if (value === null || value === undefined) return 'null'
@@ -194,6 +199,40 @@ export default function AdminPanel() {
     return Array.from(uniqueUsers.entries()).map(([id, user]) => ({ id, user }))
   }, [deletedItems, deletedLocations, deletedCategories])
 
+  const filteredCheckoutHistory = useMemo(() => {
+    let filtered = [...checkoutHistory]
+
+    if (checkoutSearchQuery) {
+      const query = checkoutSearchQuery.toLowerCase()
+      filtered = filtered.filter(log =>
+        log.item?.name?.toLowerCase().includes(query) ||
+        log.checked_out_to?.toLowerCase().includes(query)
+      )
+    }
+
+    if (checkoutStatusFilter === 'active') {
+      filtered = filtered.filter(log => !log.checked_in_at)
+    } else if (checkoutStatusFilter === 'completed') {
+      filtered = filtered.filter(log => log.checked_in_at)
+    }
+
+    if (checkoutPerformedByFilter !== 'all') {
+      filtered = filtered.filter(log => log.performed_by === checkoutPerformedByFilter)
+    }
+
+    return filtered
+  }, [checkoutHistory, checkoutSearchQuery, checkoutStatusFilter, checkoutPerformedByFilter])
+
+  const checkoutPerformedByUsers = useMemo(() => {
+    const uniqueUsers = new Map()
+    checkoutHistory.forEach(log => {
+      if (log.performed_by && log.performed_by_user) {
+        uniqueUsers.set(log.performed_by, log.performed_by_user)
+      }
+    })
+    return Array.from(uniqueUsers.entries()).map(([id, user]) => ({ id, user }))
+  }, [checkoutHistory])
+
   useEffect(() => {
     fetchData()
   }, [activeTab])
@@ -291,6 +330,18 @@ export default function AdminPanel() {
         setDeletedItems(itemsData.data || [])
         setDeletedLocations(locationsData.data || [])
         setDeletedCategories(categoriesData.data || [])
+      } else if (activeTab === 'checkout-history') {
+        const { data } = await supabase
+          .from('checkout_logs')
+          .select(`
+            *,
+            item:items(id, name, serial_number),
+            performed_by_user:users!checkout_logs_performed_by_fkey(email, first_name, last_name),
+            checked_out_to_user:users!checkout_logs_checked_out_to_user_id_fkey(email, first_name, last_name)
+          `)
+          .order('checked_out_at', { ascending: false })
+          .limit(200)
+        setCheckoutHistory(data || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -727,6 +778,18 @@ export default function AdminPanel() {
             <Trash2 className="h-4 w-4" />
             <span className="hidden sm:inline">Deleted Items</span>
             <span className="sm:hidden">Deleted</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('checkout-history')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'checkout-history'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-primary'
+              }`}
+          >
+            <ClipboardList className="h-4 w-4" />
+            <span className="hidden sm:inline">Checkout History</span>
+            <span className="sm:hidden">Checkouts</span>
           </button>
         </div>
       </div>
@@ -1669,6 +1732,215 @@ export default function AdminPanel() {
                       </table>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'checkout-history' && (
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="bg-card border rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Search */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search item or person..."
+                      value={checkoutSearchQuery}
+                      onChange={(e) => setCheckoutSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-8 py-2 border rounded-md bg-background"
+                    />
+                    {checkoutSearchQuery && (
+                      <button
+                        onClick={() => setCheckoutSearchQuery('')}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Status Filter */}
+                  <div>
+                    <select
+                      value={checkoutStatusFilter}
+                      onChange={(e) => setCheckoutStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="active">Active (Checked Out)</option>
+                      <option value="completed">Completed (Returned)</option>
+                    </select>
+                  </div>
+
+                  {/* Performed By Filter */}
+                  <div>
+                    <select
+                      value={checkoutPerformedByFilter}
+                      onChange={(e) => setCheckoutPerformedByFilter(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background"
+                    >
+                      <option value="all">All Staff</option>
+                      {checkoutPerformedByUsers.map(({ id, user }) => (
+                        <option key={id} value={id}>
+                          {getUserDisplayName(user)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Active Filters Display */}
+                {(checkoutSearchQuery || checkoutStatusFilter !== 'all' || checkoutPerformedByFilter !== 'all') && (
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                    <span className="text-sm text-muted-foreground">Active filters:</span>
+                    {checkoutSearchQuery && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        Search: "{checkoutSearchQuery}"
+                        <button onClick={() => setCheckoutSearchQuery('')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    {checkoutStatusFilter !== 'all' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        Status: {checkoutStatusFilter}
+                        <button onClick={() => setCheckoutStatusFilter('all')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    {checkoutPerformedByFilter !== 'all' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        Staff: {getUserDisplayName(checkoutPerformedByUsers.find(({ id }) => id === checkoutPerformedByFilter)?.user)}
+                        <button onClick={() => setCheckoutPerformedByFilter('all')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    <button
+                      onClick={() => {
+                        setCheckoutSearchQuery('')
+                        setCheckoutStatusFilter('all')
+                        setCheckoutPerformedByFilter('all')
+                      }}
+                      className="ml-auto text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Results */}
+              {filteredCheckoutHistory.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
+                  {checkoutHistory.length === 0 ? 'No checkout history yet' : 'No checkouts match your filters'}
+                </div>
+              ) : (
+                <div className="bg-card border rounded-lg overflow-hidden">
+                  <div className="p-4 border-b bg-muted/30">
+                    <h2 className="text-lg font-semibold">Checkout History ({filteredCheckoutHistory.length})</h2>
+                    <p className="text-sm text-muted-foreground mt-1">Complete log of all item check-ins and check-outs</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Item</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Checked Out To</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Quantity</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Checked Out</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Checked In</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Performed By</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {filteredCheckoutHistory.map((log) => {
+                          const isActive = !log.checked_in_at
+                          const isPartialReturn = log.quantity_checked_in && log.quantity_checked_in < log.quantity_checked_out
+
+                          return (
+                            <tr key={log.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium">{log.item?.name || 'Unknown Item'}</p>
+                                  {log.item?.serial_number && (
+                                    <p className="text-xs text-muted-foreground">SN: {log.item.serial_number}</p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div>
+                                  <p className="font-medium">{log.checked_out_to}</p>
+                                  {log.checked_out_to_user && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {getUserDisplayName(log.checked_out_to_user)}
+                                    </p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div>
+                                  <p>Out: {log.quantity_checked_out || 1}</p>
+                                  {log.quantity_checked_in && (
+                                    <p className="text-xs text-muted-foreground">In: {log.quantity_checked_in}</p>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {new Date(log.checked_out_at).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {log.checked_in_at ? (
+                                  new Date(log.checked_in_at).toLocaleString()
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                    isActive
+                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                      : isPartialReturn
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                      : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  }`}
+                                >
+                                  {isActive ? 'Active' : isPartialReturn ? 'Partial Return' : 'Returned'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {getUserDisplayName(log.performed_by_user)}
+                              </td>
+                              <td className="px-4 py-3 text-sm max-w-xs">
+                                {log.checkout_notes && (
+                                  <div className="mb-1">
+                                    <span className="font-medium text-xs text-muted-foreground">Out: </span>
+                                    <span className="text-xs">{log.checkout_notes}</span>
+                                  </div>
+                                )}
+                                {log.checkin_notes && (
+                                  <div>
+                                    <span className="font-medium text-xs text-muted-foreground">In: </span>
+                                    <span className="text-xs">{log.checkin_notes}</span>
+                                  </div>
+                                )}
+                                {!log.checkout_notes && !log.checkin_notes && (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
