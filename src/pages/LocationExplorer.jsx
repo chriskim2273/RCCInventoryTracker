@@ -398,6 +398,18 @@ export default function LocationExplorer() {
                     to={`/items/${item.id}`}
                     className="bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative"
                   >
+                    {item.image_url && (
+                      <div className="mb-3">
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-full h-32 object-cover rounded-md border"
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    )}
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-base truncate">{item.name}</h3>

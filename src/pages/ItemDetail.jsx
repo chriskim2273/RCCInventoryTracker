@@ -205,6 +205,19 @@ export default function ItemDetail() {
               )}
             </div>
 
+            {item.image_url && (
+              <div className="mb-4">
+                <img
+                  src={item.image_url}
+                  alt={item.name}
+                  className="w-full max-w-md h-auto rounded-lg border object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                  }}
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Brand</p>

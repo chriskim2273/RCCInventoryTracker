@@ -303,26 +303,38 @@ export default function Dashboard() {
             <div className="lg:hidden space-y-3">
               {filteredItems.map((item) => (
                 <div key={item.id} className="bg-card border rounded-lg p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        to={`/items/${item.id}`}
-                        className="text-primary hover:underline font-medium text-base block truncate"
-                      >
-                        {item.name}
-                      </Link>
-                      {item.brand && (
-                        <p className="text-sm text-muted-foreground mt-0.5">{item.brand}</p>
-                      )}
-                    </div>
-                    {canEdit && item.checked_out_by && (
-                      <input
-                        type="checkbox"
-                        checked={selectedItems.includes(item.id)}
-                        onChange={() => toggleSelectItem(item.id)}
-                        className="rounded border-gray-300 mt-1 flex-shrink-0"
+                  <div className="flex gap-3 mb-3">
+                    {item.image_url && (
+                      <img
+                        src={item.image_url}
+                        alt={item.name}
+                        className="w-16 h-16 rounded-md object-cover flex-shrink-0 border"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
                       />
                     )}
+                    <div className="flex items-start justify-between gap-3 flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          to={`/items/${item.id}`}
+                          className="text-primary hover:underline font-medium text-base block truncate"
+                        >
+                          {item.name}
+                        </Link>
+                        {item.brand && (
+                          <p className="text-sm text-muted-foreground mt-0.5">{item.brand}</p>
+                        )}
+                      </div>
+                      {canEdit && item.checked_out_by && (
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(item.id)}
+                          onChange={() => toggleSelectItem(item.id)}
+                          className="rounded border-gray-300 mt-1 flex-shrink-0"
+                        />
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -363,6 +375,7 @@ export default function Dashboard() {
                 <thead className="bg-muted/50">
                   <tr>
                     {canEdit && <th className="px-4 py-3 w-12"></th>}
+                    <th className="px-4 py-3 w-16"></th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
@@ -384,6 +397,22 @@ export default function Dashboard() {
                           />
                         </td>
                       )}
+                      <td className="px-4 py-3">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.name}
+                            className="w-12 h-12 rounded-md object-cover border"
+                            onError={(e) => {
+                              e.target.style.display = 'none'
+                            }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-md bg-muted border flex items-center justify-center">
+                            <Package className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <Link
                           to={`/items/${item.id}`}
