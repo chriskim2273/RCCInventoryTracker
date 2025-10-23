@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import sbuLogo from '@/assets/SBU_LOGO.jpeg'
+import sbuLogo from '@/assets/white-star-outlined.svg'
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('')

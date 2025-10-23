@@ -10,7 +10,7 @@ import {
   Menu,
   X
 } from 'lucide-react'
-import sbuLogo from '@/assets/SBU_LOGO.jpeg'
+import sbuLogo from '@/assets/white-star.svg'
 
 export default function Layout() {
   const { signOut, user, userRole, isAdmin, isCoordinator } = useAuth()

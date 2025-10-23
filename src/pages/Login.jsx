@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import sbuLogo from '@/assets/SBU_LOGO.jpeg'
+import sbuLogo from '@/assets/white-star-outlined.svg'
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false)

@@ -1,6 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { Clock } from 'lucide-react'
-import sbuLogo from '@/assets/SBU_LOGO.jpeg'
+import sbuLogo from '@/assets/white-star-outlined.svg'
 
 export default function Pending() {
   const { signOut, user } = useAuth()
