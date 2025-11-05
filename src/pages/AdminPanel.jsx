@@ -88,9 +88,20 @@ export default function AdminPanel() {
 
     if (auditSearchQuery) {
       const query = auditSearchQuery.toLowerCase()
-      filtered = filtered.filter(log =>
-        log.item?.name?.toLowerCase().includes(query)
-      )
+      filtered = filtered.filter(log => {
+        // Search in item name if available
+        if (log.item?.name?.toLowerCase().includes(query)) return true
+
+        // For hard-deleted items, search in the changes field
+        if (log.changes?.old?.name?.toLowerCase().includes(query)) return true
+        if (log.changes?.new?.name?.toLowerCase().includes(query)) return true
+
+        // Also search in serial numbers
+        if (log.changes?.old?.serial_number?.toLowerCase().includes(query)) return true
+        if (log.changes?.new?.serial_number?.toLowerCase().includes(query)) return true
+
+        return false
+      })
     }
 
     if (auditActionFilter !== 'all') {
@@ -287,16 +298,30 @@ export default function AdminPanel() {
         const { data } = await supabase.from('categories').select('*').is('deleted_at', null).order('name')
         setCategories(data || [])
       } else if (activeTab === 'audit') {
-        const { data } = await supabase
-          .from('item_logs')
-          .select(`
-            *,
-            item:items(name),
-            user:users(email, first_name, last_name)
-          `)
-          .order('timestamp', { ascending: false })
-          .limit(100)
-        setAuditLogs(data || [])
+        // Fetch item logs and items separately since we removed the FK constraint
+        const [logsResult, itemsResult] = await Promise.all([
+          supabase
+            .from('item_logs')
+            .select(`
+              *,
+              user:users(email, first_name, last_name)
+            `)
+            .order('timestamp', { ascending: false })
+            .limit(100),
+          supabase
+            .from('items')
+            .select('id, name')
+            .is('deleted_at', null)
+        ])
+
+        // Manually join items to logs
+        const itemsMap = new Map((itemsResult.data || []).map(item => [item.id, item]))
+        const logsWithItems = (logsResult.data || []).map(log => ({
+          ...log,
+          item: log.item_id ? itemsMap.get(log.item_id) : null
+        }))
+
+        setAuditLogs(logsWithItems)
       } else if (activeTab === 'admin-audit') {
         const { data } = await supabase
           .from('audit_logs')

@@ -67,14 +67,17 @@ Added the ability to permanently delete items, locations, and categories from th
   - Added "Location Permanently Deleted" for `hard_delete_location` action
   - Added "Category Permanently Deleted" for `hard_delete_category` action
 
-### 6. Database Migration (014_preserve_item_logs_on_hard_delete.sql)
+### 6. Database Migration (015_remove_item_logs_fk_constraint.sql)
 **IMPORTANT: This migration must be applied before using the hard delete feature!**
 
 The migration:
-- Drops the existing `item_logs.item_id` foreign key with CASCADE behavior
+- Removes the foreign key constraint on `item_logs.item_id` entirely
 - Makes `item_id` nullable to allow orphaned logs
-- Adds new foreign key with `ON DELETE SET NULL` instead of `CASCADE`
+- Creates an index for performance (since FK constraint had an implicit index)
 - This preserves audit logs even after items are permanently deleted
+
+**Why remove the FK constraint?**
+Foreign key constraints in PostgreSQL with RLS check the referenced table through RLS policies. This causes issues during the DELETE trigger when trying to log the deletion. Removing the FK constraint allows the trigger to work correctly while application logic maintains referential integrity.
 
 ## How to Apply the Migration
 
@@ -90,8 +93,27 @@ npx supabase db push
 ### Option 2: Manual Application via Supabase Dashboard
 1. Go to your Supabase project dashboard
 2. Navigate to SQL Editor
-3. Copy the contents of `supabase/migrations/014_preserve_item_logs_on_hard_delete.sql`
-4. Paste and execute the SQL
+3. Copy and paste the following SQL:
+
+```sql
+-- Remove the foreign key constraint entirely for item_logs
+-- This allows audit logs to be preserved after hard deletion
+
+-- Drop the foreign key constraint completely
+ALTER TABLE item_logs DROP CONSTRAINT IF EXISTS item_logs_item_id_fkey;
+
+-- Ensure item_id is nullable
+ALTER TABLE item_logs ALTER COLUMN item_id DROP NOT NULL;
+
+-- Add a comment explaining why there's no FK constraint
+COMMENT ON COLUMN item_logs.item_id IS 'References items(id) but without FK constraint to preserve audit logs after hard deletion. NULL indicates item was permanently deleted.';
+
+-- Create an index for performance
+CREATE INDEX IF NOT EXISTS idx_item_logs_item_id ON item_logs(item_id) WHERE item_id IS NOT NULL;
+```
+
+4. Click "Run" or press Ctrl+Enter
+5. Verify you see "Success. No rows returned"
 
 ### Option 3: Using Database URL
 ```bash
@@ -181,7 +203,7 @@ npx supabase db push --db-url "your-database-connection-string"
 
 1. `src/components/HardDeleteConfirmationModal.jsx` - New confirmation modal component (created)
 2. `src/pages/AdminPanel.jsx` - Added hard delete functions, modal integration, and UI updates
-3. `supabase/migrations/014_preserve_item_logs_on_hard_delete.sql` - Database migration (created)
+3. `supabase/migrations/015_remove_item_logs_fk_constraint.sql` - Database migration (created)
 
 ## Notes and Limitations
 
