@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
@@ -959,16 +960,28 @@ export default function AdminPanel() {
                       <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3">
                           <div>
-                            <p className="font-medium">{item.name}</p>
+                            <Link to={`/items/${item.id}`} className="font-medium text-primary hover:underline">
+                              {item.name}
+                            </Link>
                             {item.serial_number && (
                               <p className="text-xs text-muted-foreground">SN: {item.serial_number}</p>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm">{item.category?.name || 'N/A'}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {item.category?.name ? (
+                            <Link to={`/items?category=${item.category_id}`} className="text-primary hover:underline">
+                              {item.category.name}
+                            </Link>
+                          ) : 'N/A'}
+                        </td>
                         <td className="px-4 py-3 text-sm">
                           <div>
-                            <p>{item.location?.name || 'N/A'}</p>
+                            {item.location?.name ? (
+                              <Link to={`/locations/${item.location.id}`} className="text-primary hover:underline">
+                                {item.location.name}
+                              </Link>
+                            ) : 'N/A'}
                             {item.location?.path && (
                               <p className="text-xs text-muted-foreground">{item.location.path}</p>
                             )}
@@ -1035,7 +1048,11 @@ export default function AdminPanel() {
                   <tbody className="divide-y">
                     {locations.map((location) => (
                       <tr key={location.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-medium">{location.name}</td>
+                        <td className="px-4 py-3">
+                          <Link to={`/locations/${location.id}`} className="font-medium text-primary hover:underline">
+                            {location.name}
+                          </Link>
+                        </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
                         <td className="px-4 py-3 text-sm">
                           {location.parent_id ? 'Has parent' : 'Root level'}
@@ -1086,10 +1103,10 @@ export default function AdminPanel() {
                 {categories.map((category) => (
                   <div key={category.id} className="bg-card border rounded-lg p-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <Link to={`/items?category=${category.id}`} className="flex items-center gap-2 hover:underline">
                         {category.icon && <span className="text-2xl">{category.icon}</span>}
-                        <span className="font-medium">{category.name}</span>
-                      </div>
+                        <span className="font-medium text-primary">{category.name}</span>
+                      </Link>
 
                       <div className="flex items-center gap-2">
                         <button
@@ -1241,7 +1258,13 @@ export default function AdminPanel() {
                             >
                               {log.action.replace('_', ' ')}
                             </span>
-                            <h3 className="font-semibold text-lg">{log.item?.name || 'Unknown Item'}</h3>
+                            {log.item ? (
+                              <Link to={`/items/${log.item.id}`} className="font-semibold text-lg text-primary hover:underline">
+                                {log.item.name}
+                              </Link>
+                            ) : (
+                              <h3 className="font-semibold text-lg">Unknown Item</h3>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground">
                             {new Date(log.timestamp).toLocaleString()} • {getUserDisplayName(log.user)}
@@ -1616,9 +1639,25 @@ export default function AdminPanel() {
                         <tbody className="divide-y">
                           {filteredDeletedItems.map((item) => (
                             <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                              <td className="px-4 py-3 font-medium">{item.name}</td>
-                              <td className="px-4 py-3 text-sm">{item.category?.name || 'N/A'}</td>
-                              <td className="px-4 py-3 text-sm">{item.location?.name || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                <Link to={`/items/${item.id}`} className="font-medium text-primary hover:underline">
+                                  {item.name}
+                                </Link>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {item.category?.name ? (
+                                  <Link to={`/items?category=${item.category_id}`} className="text-primary hover:underline">
+                                    {item.category.name}
+                                  </Link>
+                                ) : 'N/A'}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {item.location?.name ? (
+                                  <Link to={`/locations/${item.location.id}`} className="text-primary hover:underline">
+                                    {item.location.name}
+                                  </Link>
+                                ) : 'N/A'}
+                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(item.deleted_at).toLocaleString()}
                               </td>
@@ -1664,7 +1703,11 @@ export default function AdminPanel() {
                         <tbody className="divide-y">
                           {filteredDeletedLocations.map((location) => (
                             <tr key={location.id} className="hover:bg-muted/30 transition-colors">
-                              <td className="px-4 py-3 font-medium">{location.name}</td>
+                              <td className="px-4 py-3">
+                                <Link to={`/locations/${location.id}`} className="font-medium text-primary hover:underline">
+                                  {location.name}
+                                </Link>
+                              </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(location.deleted_at).toLocaleString()}
@@ -1868,7 +1911,13 @@ export default function AdminPanel() {
                             <tr key={log.id} className="hover:bg-muted/30 transition-colors">
                               <td className="px-4 py-3">
                                 <div>
-                                  <p className="font-medium">{log.item?.name || 'Unknown Item'}</p>
+                                  {log.item ? (
+                                    <Link to={`/items/${log.item.id}`} className="font-medium text-primary hover:underline">
+                                      {log.item.name}
+                                    </Link>
+                                  ) : (
+                                    <p className="font-medium">Unknown Item</p>
+                                  )}
                                   {log.item?.serial_number && (
                                     <p className="text-xs text-muted-foreground">SN: {log.item.serial_number}</p>
                                   )}

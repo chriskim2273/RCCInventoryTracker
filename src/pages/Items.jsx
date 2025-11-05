@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Package, Search, Download, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
 
 export default function Items() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [items, setItems] = useState([])
   const [filteredItems, setFilteredItems] = useState([])
   const [categories, setCategories] = useState([])
@@ -22,6 +23,14 @@ export default function Items() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Read category from URL params on mount and when params change
+  useEffect(() => {
+    const categoryParam = searchParams.get('category')
+    if (categoryParam) {
+      setSelectedCategory(categoryParam)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     filterItems()
