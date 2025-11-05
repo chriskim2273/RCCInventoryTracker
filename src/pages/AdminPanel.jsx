@@ -423,6 +423,10 @@ export default function AdminPanel() {
   }
 
   const handleResendConfirmation = async (email) => {
+    if (!confirm(`Are you sure you want to resend the confirmation email to ${email}?`)) {
+      return
+    }
+
     try {
       await resendConfirmationEmail(email)
       alert(`Confirmation email resent to ${email}`)
@@ -1492,7 +1496,6 @@ export default function AdminPanel() {
                       <option value="delete_user">Delete User</option>
                       <option value="resend_confirmation">Resend Confirmation</option>
                       <option value="reset_password">Reset Password</option>
-                      <option value="update_email">Update Email</option>
                       <option value="delete_location">Delete Location</option>
                       <option value="restore_location">Restore Location</option>
                       <option value="hard_delete_location">Hard Delete Location</option>
@@ -1500,7 +1503,6 @@ export default function AdminPanel() {
                       <option value="hard_delete_item">Hard Delete Item</option>
                       <option value="restore_category">Restore Category</option>
                       <option value="hard_delete_category">Hard Delete Category</option>
-                      <option value="bulk_delete">Bulk Delete</option>
                     </select>
                   </div>
 
