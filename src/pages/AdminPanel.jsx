@@ -276,17 +276,30 @@ export default function AdminPanel() {
           setUsers(data || [])
         }
       } else if (activeTab === 'items') {
-        const { data } = await supabase
-          .from('items')
-          .select(`
-            *,
-            category:categories(name),
-            location:locations(name, path),
-            created_by_user:users!items_created_by_fkey(email, first_name, last_name)
-          `)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false })
-        setItems(data || [])
+        // Fetch items and users separately since we removed the FK constraint
+        const [itemsResult, usersResult] = await Promise.all([
+          supabase
+            .from('items')
+            .select(`
+              *,
+              category:categories(name),
+              location:locations(name, path)
+            `)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
+        ])
+
+        // Manually join users to items
+        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+        const itemsWithUsers = (itemsResult.data || []).map(item => ({
+          ...item,
+          created_by_user: item.created_by ? usersMap.get(item.created_by) : null
+        }))
+
+        setItems(itemsWithUsers)
       } else if (activeTab === 'locations') {
         const { data } = await supabase
           .from('locations')
@@ -298,84 +311,129 @@ export default function AdminPanel() {
         const { data } = await supabase.from('categories').select('*').is('deleted_at', null).order('name')
         setCategories(data || [])
       } else if (activeTab === 'audit') {
-        // Fetch item logs and items separately since we removed the FK constraint
-        const [logsResult, itemsResult] = await Promise.all([
+        // Fetch item logs, items, and users separately since we removed the FK constraints
+        const [logsResult, itemsResult, usersResult] = await Promise.all([
           supabase
             .from('item_logs')
-            .select(`
-              *,
-              user:users(email, first_name, last_name)
-            `)
+            .select('*')
             .order('timestamp', { ascending: false })
             .limit(100),
           supabase
             .from('items')
             .select('id, name')
-            .is('deleted_at', null)
+            .is('deleted_at', null),
+          supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
         ])
 
-        // Manually join items to logs
+        // Manually join items and users to logs
         const itemsMap = new Map((itemsResult.data || []).map(item => [item.id, item]))
-        const logsWithItems = (logsResult.data || []).map(log => ({
+        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+        const logsWithJoins = (logsResult.data || []).map(log => ({
           ...log,
-          item: log.item_id ? itemsMap.get(log.item_id) : null
+          item: log.item_id ? itemsMap.get(log.item_id) : null,
+          user: log.user_id ? usersMap.get(log.user_id) : null
         }))
 
-        setAuditLogs(logsWithItems)
+        setAuditLogs(logsWithJoins)
       } else if (activeTab === 'admin-audit') {
-        const { data } = await supabase
-          .from('audit_logs')
-          .select(`
-            *,
-            user:users(email, first_name, last_name)
-          `)
-          .order('created_at', { ascending: false })
-          .limit(100)
-        setAdminAuditLogs(data || [])
+        // Fetch audit logs and users separately since we removed the FK constraint
+        const [logsResult, usersResult] = await Promise.all([
+          supabase
+            .from('audit_logs')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100),
+          supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
+        ])
+
+        // Manually join users to logs
+        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+        const logsWithUsers = (logsResult.data || []).map(log => ({
+          ...log,
+          user: log.user_id ? usersMap.get(log.user_id) : null
+        }))
+
+        setAdminAuditLogs(logsWithUsers)
       } else if (activeTab === 'deleted') {
-        const [itemsData, locationsData, categoriesData] = await Promise.all([
+        // Fetch deleted items/locations/categories and users separately since we removed FK constraints
+        const [itemsData, locationsData, categoriesData, usersResult] = await Promise.all([
           supabase
             .from('items')
             .select(`
               *,
               category:categories(name),
-              location:locations(name),
-              deleted_by_user:users!items_deleted_by_fkey(email, first_name, last_name)
+              location:locations(name)
             `)
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
           supabase
             .from('locations')
-            .select(`
-              *,
-              deleted_by_user:users!locations_deleted_by_fkey(email, first_name, last_name)
-            `)
+            .select('*')
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
           supabase
             .from('categories')
-            .select(`
-              *,
-              deleted_by_user:users!categories_deleted_by_fkey(email, first_name, last_name)
-            `)
+            .select('*')
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
+          supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
         ])
-        setDeletedItems(itemsData.data || [])
-        setDeletedLocations(locationsData.data || [])
-        setDeletedCategories(categoriesData.data || [])
+
+        // Manually join users to deleted items
+        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+
+        const itemsWithUsers = (itemsData.data || []).map(item => ({
+          ...item,
+          deleted_by_user: item.deleted_by ? usersMap.get(item.deleted_by) : null
+        }))
+
+        const locationsWithUsers = (locationsData.data || []).map(location => ({
+          ...location,
+          deleted_by_user: location.deleted_by ? usersMap.get(location.deleted_by) : null
+        }))
+
+        const categoriesWithUsers = (categoriesData.data || []).map(category => ({
+          ...category,
+          deleted_by_user: category.deleted_by ? usersMap.get(category.deleted_by) : null
+        }))
+
+        setDeletedItems(itemsWithUsers)
+        setDeletedLocations(locationsWithUsers)
+        setDeletedCategories(categoriesWithUsers)
       } else if (activeTab === 'checkout-history') {
-        const { data } = await supabase
-          .from('checkout_logs')
-          .select(`
-            *,
-            item:items(id, name, serial_number),
-            performed_by_user:users!checkout_logs_performed_by_fkey(email, first_name, last_name),
-            checked_out_to_user:users!checkout_logs_checked_out_to_user_id_fkey(email, first_name, last_name)
-          `)
-          .order('checked_out_at', { ascending: false })
-          .limit(200)
-        setCheckoutHistory(data || [])
+        // Fetch checkout logs, items, and users separately since we removed FK constraints
+        const [logsResult, itemsResult, usersResult] = await Promise.all([
+          supabase
+            .from('checkout_logs')
+            .select('*')
+            .order('checked_out_at', { ascending: false })
+            .limit(200),
+          supabase
+            .from('items')
+            .select('id, name, serial_number')
+            .is('deleted_at', null),
+          supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
+        ])
+
+        // Manually join items and users to checkout logs
+        const itemsMap = new Map((itemsResult.data || []).map(item => [item.id, item]))
+        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+        const logsWithJoins = (logsResult.data || []).map(log => ({
+          ...log,
+          item: log.item_id ? itemsMap.get(log.item_id) : null,
+          performed_by_user: log.performed_by ? usersMap.get(log.performed_by) : null,
+          checked_out_to_user: log.checked_out_to_user_id ? usersMap.get(log.checked_out_to_user_id) : null
+        }))
+
+        setCheckoutHistory(logsWithJoins)
       }
     } catch (error) {
       console.error('Error fetching data:', error)

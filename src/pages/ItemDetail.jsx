@@ -133,48 +133,63 @@ export default function ItemDetail() {
     setLoading(true)
 
     try {
-      const { data: itemData } = await supabase
-        .from('items')
-        .select(`
-          *,
-          category:categories(name, icon),
-          location:locations(name, path),
-          created_by_user:users!items_created_by_fkey(email, first_name, last_name),
-          checked_out_by_user:users!items_checked_out_by_fkey(email, first_name, last_name)
-        `)
-        .eq('id', itemId)
-        .single()
-
-      setItem(itemData)
-
-      // Calculate item availability
-      const availabilityInfo = await calculateItemAvailability(itemData)
-      setAvailability(availabilityInfo)
-      setActiveCheckouts(availabilityInfo.activeCheckouts)
-
-      const [logsData, checkoutLogsData] = await Promise.all([
+      // Fetch item, logs, checkout logs, and users separately since we removed FK constraints
+      const [itemResult, logsData, checkoutLogsData, usersResult] = await Promise.all([
         supabase
-          .from('item_logs')
+          .from('items')
           .select(`
             *,
-            user:users(email, first_name, last_name)
+            category:categories(name, icon),
+            location:locations(name, path)
           `)
+          .eq('id', itemId)
+          .single(),
+        supabase
+          .from('item_logs')
+          .select('*')
           .eq('item_id', itemId)
           .order('timestamp', { ascending: false })
           .limit(20),
         supabase
           .from('checkout_logs')
-          .select(`
-            *,
-            checked_out_to_user:users!checkout_logs_checked_out_to_user_id_fkey(email, first_name, last_name),
-            performed_by_user:users!checkout_logs_performed_by_fkey(email, first_name, last_name)
-          `)
+          .select('*')
           .eq('item_id', itemId)
-          .order('checked_out_at', { ascending: false })
+          .order('checked_out_at', { ascending: false }),
+        supabase
+          .from('users')
+          .select('id, email, first_name, last_name')
       ])
 
-      setLogs(consolidateLogs(logsData.data || []))
-      setCheckoutLogs(checkoutLogsData.data || [])
+      // Manually join users to item
+      const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+      const itemWithUsers = {
+        ...itemResult.data,
+        created_by_user: itemResult.data?.created_by ? usersMap.get(itemResult.data.created_by) : null,
+        checked_out_by_user: itemResult.data?.checked_out_by ? usersMap.get(itemResult.data.checked_out_by) : null
+      }
+
+      setItem(itemWithUsers)
+
+      // Calculate item availability
+      const availabilityInfo = await calculateItemAvailability(itemWithUsers)
+      setAvailability(availabilityInfo)
+      setActiveCheckouts(availabilityInfo.activeCheckouts)
+
+      // Manually join users to logs
+      const logsWithUsers = (logsData.data || []).map(log => ({
+        ...log,
+        user: log.user_id ? usersMap.get(log.user_id) : null
+      }))
+
+      // Manually join users to checkout logs
+      const checkoutLogsWithUsers = (checkoutLogsData.data || []).map(log => ({
+        ...log,
+        checked_out_to_user: log.checked_out_to_user_id ? usersMap.get(log.checked_out_to_user_id) : null,
+        performed_by_user: log.performed_by ? usersMap.get(log.performed_by) : null
+      }))
+
+      setLogs(consolidateLogs(logsWithUsers))
+      setCheckoutLogs(checkoutLogsWithUsers)
     } catch (error) {
       console.error('Error fetching item:', error)
     } finally {
