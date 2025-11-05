@@ -6,6 +6,7 @@ import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import HardDeleteConfirmationModal from '@/components/HardDeleteConfirmationModal'
 import RoleChangeConfirmationModal from '@/components/RoleChangeConfirmationModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { getUserDetails, deleteUser, resendConfirmationEmail, resetUserPassword } from '@/lib/adminApi'
@@ -35,6 +36,13 @@ export default function AdminPanel() {
     id: null,
     name: null,
     affectedData: null,
+  })
+  const [showHardDeleteModal, setShowHardDeleteModal] = useState(false)
+  const [hardDeleteModalData, setHardDeleteModalData] = useState({
+    type: null, // 'item', 'location', 'category'
+    id: null,
+    name: null,
+    details: null, // { serialNumber, path, etc }
   })
   const [showRoleChangeModal, setShowRoleChangeModal] = useState(false)
   const [roleChangeData, setRoleChangeData] = useState({
@@ -692,6 +700,132 @@ export default function AdminPanel() {
     }
   }
 
+  const prepareHardDeleteItem = async (itemId) => {
+    // Get the item details for the modal
+    const { data: itemData } = await supabase
+      .from('items')
+      .select('name, serial_number')
+      .eq('id', itemId)
+      .single()
+
+    if (itemData) {
+      setHardDeleteModalData({
+        type: 'item',
+        id: itemId,
+        name: itemData.name,
+        details: {
+          serialNumber: itemData.serial_number,
+        },
+      })
+      setShowHardDeleteModal(true)
+    }
+  }
+
+  const prepareHardDeleteLocation = async (locationId) => {
+    // Get the location details for the modal
+    const { data: locationData } = await supabase
+      .from('locations')
+      .select('name, path')
+      .eq('id', locationId)
+      .single()
+
+    if (locationData) {
+      setHardDeleteModalData({
+        type: 'location',
+        id: locationId,
+        name: locationData.name,
+        details: {
+          path: locationData.path,
+        },
+      })
+      setShowHardDeleteModal(true)
+    }
+  }
+
+  const prepareHardDeleteCategory = async (categoryId) => {
+    // Get the category details for the modal
+    const { data: categoryData } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('id', categoryId)
+      .single()
+
+    if (categoryData) {
+      setHardDeleteModalData({
+        type: 'category',
+        id: categoryId,
+        name: categoryData.name,
+        details: null,
+      })
+      setShowHardDeleteModal(true)
+    }
+  }
+
+  const confirmHardDelete = async () => {
+    const { type, id, name, details } = hardDeleteModalData
+
+    if (type === 'item') {
+      // Perform the hard delete - this will trigger the database trigger to log to item_logs
+      const { error } = await supabase
+        .from('items')
+        .delete()
+        .eq('id', id)
+
+      if (!error) {
+        // Log to admin audit logs
+        await supabase.from('audit_logs').insert({
+          user_id: currentUser?.id,
+          action: 'hard_delete_item',
+          details: {
+            item_name: name,
+            item_serial_number: details?.serialNumber,
+          },
+        })
+
+        fetchData()
+      }
+    } else if (type === 'location') {
+      // Perform the hard delete
+      const { error } = await supabase
+        .from('locations')
+        .delete()
+        .eq('id', id)
+
+      if (!error) {
+        // Log to admin audit logs
+        await supabase.from('audit_logs').insert({
+          user_id: currentUser?.id,
+          action: 'hard_delete_location',
+          details: {
+            location_name: name,
+            location_path: details?.path,
+          },
+        })
+
+        fetchData()
+      }
+    } else if (type === 'category') {
+      // Perform the hard delete
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id)
+
+      if (!error) {
+        // Log to admin audit logs
+        await supabase.from('audit_logs').insert({
+          user_id: currentUser?.id,
+          action: 'hard_delete_category',
+          details: {
+            category_name: name,
+          },
+        })
+
+        fetchData()
+      }
+    }
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
@@ -1317,6 +1451,22 @@ export default function AdminPanel() {
                               </div>
                             </div>
                           )}
+                          {log.action === 'delete' && log.changes.old && (
+                            <div>
+                              <p className="font-medium text-muted-foreground mb-2">Item permanently deleted with the following values:</p>
+                              <div className="ml-2 space-y-1 bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-900">
+                                {Object.entries(log.changes.old).map(([key, value]) => {
+                                  if (['id', 'created_at', 'updated_at', 'created_by', 'deleted_at', 'deleted_by'].includes(key)) return null
+                                  return (
+                                    <div key={key} className="flex items-start gap-2">
+                                      <span className="text-muted-foreground min-w-32">{key}:</span>
+                                      <span className="font-medium flex-1">{formatValue(value)}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1345,8 +1495,11 @@ export default function AdminPanel() {
                       <option value="update_email">Update Email</option>
                       <option value="delete_location">Delete Location</option>
                       <option value="restore_location">Restore Location</option>
+                      <option value="hard_delete_location">Hard Delete Location</option>
                       <option value="restore_item">Restore Item</option>
+                      <option value="hard_delete_item">Hard Delete Item</option>
                       <option value="restore_category">Restore Category</option>
+                      <option value="hard_delete_category">Hard Delete Category</option>
                       <option value="bulk_delete">Bulk Delete</option>
                     </select>
                   </div>
@@ -1417,14 +1570,17 @@ export default function AdminPanel() {
                             <h3 className="font-semibold text-lg">
                               {log.action === 'delete_location' && 'Location Deletion'}
                               {log.action === 'restore_location' && 'Location Restored'}
+                              {log.action === 'hard_delete_location' && 'Location Permanently Deleted'}
                               {log.action === 'restore_item' && 'Item Restored'}
+                              {log.action === 'hard_delete_item' && 'Item Permanently Deleted'}
                               {log.action === 'restore_category' && 'Category Restored'}
+                              {log.action === 'hard_delete_category' && 'Category Permanently Deleted'}
                               {log.action === 'bulk_delete' && 'Bulk Deletion'}
                               {log.action === 'delete_user' && 'User Deletion'}
                               {log.action === 'resend_confirmation' && 'Resend Confirmation Email'}
                               {log.action.includes('reset_password') && 'Password Reset'}
                               {log.action.includes('update_email') && 'Email Update'}
-                              {!['delete_location', 'restore_location', 'restore_item', 'restore_category', 'bulk_delete', 'delete_user', 'resend_confirmation'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
+                              {!['delete_location', 'restore_location', 'hard_delete_location', 'restore_item', 'hard_delete_item', 'restore_category', 'hard_delete_category', 'bulk_delete', 'delete_user', 'resend_confirmation'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
                             </h3>
                             <p className="text-sm text-muted-foreground">
                               {new Date(log.created_at).toLocaleString()}
@@ -1663,13 +1819,22 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-4 py-3 text-sm">{getUserDisplayName(item.deleted_by_user)}</td>
                               <td className="px-4 py-3">
-                                <button
-                                  onClick={() => restoreItem(item.id)}
-                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                  Restore
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => restoreItem(item.id)}
+                                    className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Restore
+                                  </button>
+                                  <button
+                                    onClick={() => prepareHardDeleteItem(item.id)}
+                                    className="flex items-center gap-1 text-sm text-destructive hover:underline"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Hard Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1714,13 +1879,22 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-4 py-3 text-sm">{getUserDisplayName(location.deleted_by_user)}</td>
                               <td className="px-4 py-3">
-                                <button
-                                  onClick={() => restoreLocation(location.id)}
-                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                  Restore
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => restoreLocation(location.id)}
+                                    className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Restore
+                                  </button>
+                                  <button
+                                    onClick={() => prepareHardDeleteLocation(location.id)}
+                                    className="flex items-center gap-1 text-sm text-destructive hover:underline"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Hard Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1761,13 +1935,22 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-4 py-3 text-sm">{getUserDisplayName(category.deleted_by_user)}</td>
                               <td className="px-4 py-3">
-                                <button
-                                  onClick={() => restoreCategory(category.id)}
-                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" />
-                                  Restore
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => restoreCategory(category.id)}
+                                    className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                    Restore
+                                  </button>
+                                  <button
+                                    onClick={() => prepareHardDeleteCategory(category.id)}
+                                    className="flex items-center gap-1 text-sm text-destructive hover:underline"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                    Hard Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -2036,6 +2219,16 @@ export default function AdminPanel() {
         itemType={deleteModalData.type}
         userEmail={currentUser?.email || ''}
         affectedData={deleteModalData.affectedData}
+      />
+
+      <HardDeleteConfirmationModal
+        isOpen={showHardDeleteModal}
+        onClose={() => setShowHardDeleteModal(false)}
+        onConfirm={confirmHardDelete}
+        itemType={hardDeleteModalData.type}
+        itemName={hardDeleteModalData.name || ''}
+        itemDetails={hardDeleteModalData.details}
+        userEmail={currentUser?.email || ''}
       />
 
       <RoleChangeConfirmationModal
