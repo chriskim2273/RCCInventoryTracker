@@ -8,6 +8,8 @@ A modern, role-based inventory management application built with React, Vite, an
 - **Nested Location Hierarchy**: Organize inventory by Centers → Rooms → Shelves → Drawers
 - **Item Management**: Track unique items by serial number or bulk items by quantity
 - **Check-In/Check-Out System**: Track who has items checked out
+- **AI-Powered Search**: Natural language search using OpenRouter LLMs (optional)
+- **Advanced Filtering**: Filter by category, status, location with real-time updates
 - **Automatic Change Logs**: Every action is logged automatically
 - **Category Organization**: Group items by categories (Laptops, Mice, etc.)
 - **Image Support**: Upload and display item images via Supabase Storage
@@ -18,6 +20,7 @@ A modern, role-based inventory management application built with React, Vite, an
 - **Frontend**: React 18 + Vite
 - **Styling**: TailwindCSS + Shadcn/UI
 - **Backend**: Supabase (PostgreSQL + Auth + Storage)
+- **AI Search**: OpenRouter (optional, with multiple free model fallbacks)
 - **Routing**: React Router v6
 - **Icons**: Lucide React
 
@@ -28,17 +31,20 @@ TablerInventoryTracker/
 ├── src/
 │   ├── components/
 │   │   ├── Layout.jsx              # Main app layout with navigation
-│   │   └── ProtectedRoute.jsx      # Route wrapper for auth/role checks
+│   │   ├── ProtectedRoute.jsx      # Route wrapper for auth/role checks
+│   │   └── SearchBar.jsx           # Optimized search input with AI toggle
 │   ├── contexts/
 │   │   └── AuthContext.jsx         # Authentication state management
 │   ├── lib/
 │   │   ├── supabase.js            # Supabase client configuration
+│   │   ├── aiSearch.js            # OpenRouter AI search integration
 │   │   └── utils.js               # Utility functions (cn)
 │   ├── pages/
 │   │   ├── Login.jsx              # Login/Sign up page
 │   │   ├── Pending.jsx            # Pending approval page
 │   │   ├── Dashboard.jsx          # Main dashboard with stats
 │   │   ├── LocationExplorer.jsx   # Browse location hierarchy
+│   │   ├── Items.jsx              # All items with search & filters
 │   │   ├── ItemDetail.jsx         # Item details & logs
 │   │   └── AdminPanel.jsx         # User & category management
 │   ├── App.jsx                    # Main app with routing
@@ -78,9 +84,43 @@ Copy `.env.example` to `.env` and add your Supabase credentials:
 ```env
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_OPENROUTER_API_KEY=sk-or-v1-... # Optional: for AI Search feature
 ```
 
-### 4. Run the Development Server
+### 4. Configure OpenRouter for AI Search (Optional)
+
+The app includes an AI-powered search feature that uses OpenRouter to enable natural language item searches.
+
+#### 🔑 Get Your OpenRouter API Key
+
+1. Go to [OpenRouter.ai](https://openrouter.ai/)
+2. Sign up or log in with your account
+3. Navigate to [Keys](https://openrouter.ai/keys) in your dashboard
+4. Click **Create Key** and copy your API key (starts with `sk-or-v1-...`)
+
+#### ⚙️ Add to Environment Variables
+
+Add your OpenRouter API key to `.env`:
+
+```env
+VITE_OPENROUTER_API_KEY=sk-or-v1-your-key-here
+```
+
+#### 💡 How AI Search Works
+
+- **Token-Optimized**: Only sends essential item data (id, name, brand, model)
+- **Automatic Fallback**: Tries multiple free models if one fails
+- **Smart Matching**: Uses LLM to understand natural language queries
+- **Zero Cost**: Uses free OpenRouter models by default
+
+**Example searches:**
+- "red laptop" → Finds laptops with red in the name/description
+- "wireless mouse" → Matches mice with wireless connectivity
+- "projector in room 3" → Semantic search across fields
+
+If you don't configure OpenRouter, the regular text search will still work perfectly.
+
+### 5. Run the Development Server
 
 ```bash
 npm run dev
@@ -88,7 +128,7 @@ npm run dev
 
 The app will be available at `http://localhost:5173`
 
-### 5. Create Your First Admin User
+### 6. Create Your First Admin User
 
 1. Sign up through the app (you'll be created with 'pending' role)
 2. In Supabase dashboard, run this SQL:
@@ -151,6 +191,7 @@ See `supabase/migrations/001_initial_schema.sql` for full schema.
 - ✅ Add/Edit Location modal
 - ✅ Add Category modal in Admin panel
 - ✅ Search functionality across items
+- ✅ AI-Powered search with OpenRouter integration
 - ✅ Advanced filters (by status, category, location)
 - ✅ Bulk operations (check-in multiple items)
 - ✅ CSV export for inventory reports

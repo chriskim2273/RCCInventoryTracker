@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, memo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Package, Search, Download, CheckCircle, Trash2, MapPin, X } from 'lucide-react'
+import { Package, CheckCircle, Trash2, MapPin, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import SearchBar from '@/components/SearchBar'
+import { aiSearch } from '@/lib/aiSearch'
 
 // Memoized Mobile Item Card Component
 const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
@@ -191,6 +193,10 @@ export default function Items() {
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [moveToLocationId, setMoveToLocationId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [useAiSearch, setUseAiSearch] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [aiMatchingIds, setAiMatchingIds] = useState([])
+  const [aiSearchError, setAiSearchError] = useState(null)
   const { canEdit, user } = useAuth()
 
   useEffect(() => {
@@ -215,7 +221,7 @@ export default function Items() {
 
   useEffect(() => {
     filterItems()
-  }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds])
+  }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds, useAiSearch, aiMatchingIds])
 
   useEffect(() => {
     if (selectedLocation) {
@@ -224,6 +230,32 @@ export default function Items() {
       setSublocationIds([])
     }
   }, [selectedLocation, locations])
+
+  // AI Search Effect
+  useEffect(() => {
+    if (!useAiSearch || !searchQuery.trim()) {
+      setAiMatchingIds([])
+      setAiSearchError(null)
+      return
+    }
+
+    const performAiSearch = async () => {
+      setSearchLoading(true)
+      setAiSearchError(null)
+      try {
+        const matchingIds = await aiSearch(items, searchQuery)
+        setAiMatchingIds(matchingIds)
+      } catch (error) {
+        console.error('AI search failed:', error)
+        setAiSearchError(error.message)
+        setAiMatchingIds([])
+      } finally {
+        setSearchLoading(false)
+      }
+    }
+
+    performAiSearch()
+  }, [useAiSearch, searchQuery, items])
 
   // Recursively get all sublocation IDs for a given location
   const getAllSublocationIds = async (locationId) => {
@@ -317,17 +349,23 @@ export default function Items() {
   const filterItems = () => {
     let filtered = [...items]
 
-    // Filter by search query
+    // Filter by search query (AI or regular)
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (item) =>
-          item.name?.toLowerCase().includes(query) ||
-          item.brand?.toLowerCase().includes(query) ||
-          item.model?.toLowerCase().includes(query) ||
-          item.serial_number?.toLowerCase().includes(query) ||
-          item.stony_brook_asset_tag?.toLowerCase().includes(query)
-      )
+      if (useAiSearch && aiMatchingIds.length > 0) {
+        // Use AI search results
+        filtered = filtered.filter((item) => aiMatchingIds.includes(item.id))
+      } else if (!useAiSearch) {
+        // Use regular search
+        const query = searchQuery.toLowerCase()
+        filtered = filtered.filter(
+          (item) =>
+            item.name?.toLowerCase().includes(query) ||
+            item.brand?.toLowerCase().includes(query) ||
+            item.model?.toLowerCase().includes(query) ||
+            item.serial_number?.toLowerCase().includes(query) ||
+            item.stony_brook_asset_tag?.toLowerCase().includes(query)
+        )
+      }
     }
 
     // Filter by category
@@ -349,6 +387,30 @@ export default function Items() {
 
     setFilteredItems(filtered)
   }
+
+  const handleRegularSearch = useCallback((inputValue) => {
+    setSearchLoading(true)
+    setUseAiSearch(false)
+    setSearchQuery(inputValue)
+    setAiSearchError(null)
+    setAiMatchingIds([])
+    // Simulate brief loading for UI consistency
+    setTimeout(() => {
+      setSearchLoading(false)
+    }, 100)
+  }, [])
+
+  const handleAiSearch = useCallback((inputValue) => {
+    setUseAiSearch(true)
+    setSearchQuery(inputValue)
+  }, [])
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('')
+    setUseAiSearch(false)
+    setAiMatchingIds([])
+    setAiSearchError(null)
+  }, [])
 
   const toggleSelectItem = useCallback((itemId) => {
     setSelectedItems((prev) => {
@@ -456,26 +518,16 @@ export default function Items() {
       </div>
 
       <div className="space-y-3 sm:space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm sm:text-base border rounded-md bg-background"
-            />
-          </div>
-          <button
-            onClick={exportToCSV}
-            className="flex items-center justify-center gap-2 px-4 py-2 border rounded-md hover:bg-secondary transition-colors text-sm sm:text-base whitespace-nowrap"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export CSV</span>
-            <span className="sm:hidden">Export</span>
-          </button>
-        </div>
+        <SearchBar
+          onRegularSearch={handleRegularSearch}
+          onAiSearch={handleAiSearch}
+          onClearSearch={handleClearSearch}
+          onExportCSV={exportToCSV}
+          searchLoading={searchLoading}
+          useAiSearch={useAiSearch}
+          activeSearchQuery={searchQuery}
+          aiSearchError={aiSearchError}
+        />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
