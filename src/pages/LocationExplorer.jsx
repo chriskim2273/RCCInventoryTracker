@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { ChevronRight, Home, Plus, Minus, Edit, Trash2 } from 'lucide-react'
+import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
@@ -598,15 +598,30 @@ export default function LocationExplorer() {
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
                 <h2 className="text-lg sm:text-xl font-semibold">Items at this Location and Sublocations</h2>
-                {canEdit && (
-                  <button
-                    onClick={() => setShowItemModal(true)}
-                    className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add Item
-                  </button>
-                )}
+                <div className="flex gap-2">
+                  <div className="relative group">
+                    <Link
+                      to={`/items?location=${locationId}`}
+                      className="flex items-center justify-center gap-2 border px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm sm:text-base"
+                    >
+                      <List className="h-4 w-4" />
+                      View All Items
+                    </Link>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap pointer-events-none z-50">
+                      View all items with multi-select, bulk delete & move
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <button
+                      onClick={() => setShowItemModal(true)}
+                      className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Item
+                    </button>
+                  )}
+                </div>
               </div>
 
               {items.length === 0 ? (
