@@ -28,11 +28,20 @@ export default function DeleteConfirmationModal({
   const getConfirmationChecks = () => {
     const checks = []
 
-    // Base confirmation
-    checks.push({
-      id: 'understand_deletion',
-      label: `I understand this will delete "${itemName}"`,
-    })
+    // Base confirmation - handle multiple items for bulk delete
+    const isMultiItemDelete = itemType === 'item' && affectedData?.items && affectedData.items.length > 1
+
+    if (isMultiItemDelete) {
+      checks.push({
+        id: 'understand_deletion',
+        label: `I understand this will delete ${affectedData.items.length} items`,
+      })
+    } else {
+      checks.push({
+        id: 'understand_deletion',
+        label: `I understand this will delete "${itemName}"`,
+      })
+    }
 
     // Type-specific confirmations
     if (itemType === 'category' && affectedData?.items?.length > 0) {

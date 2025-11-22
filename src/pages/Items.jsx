@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Package, Search, Download, CheckCircle, Trash2, MapPin, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
+import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 
 // Memoized Mobile Item Card Component
 const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
@@ -190,7 +191,7 @@ export default function Items() {
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [moveToLocationId, setMoveToLocationId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const { canEdit } = useAuth()
+  const { canEdit, user } = useAuth()
 
   useEffect(() => {
     fetchData()
@@ -402,24 +403,22 @@ export default function Items() {
   }
 
   const handleBulkDelete = async () => {
-    setIsProcessing(true)
-    try {
-      const { error } = await supabase
-        .from('items')
-        .update({ deleted_at: new Date().toISOString() })
-        .in('id', Array.from(selectedItems))
+    const { error } = await supabase
+      .from('items')
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: user?.id,
+      })
+      .in('id', Array.from(selectedItems))
 
-      if (error) throw error
-
-      await fetchData()
-      setSelectedItems(new Set())
-      setShowDeleteModal(false)
-    } catch (error) {
+    if (error) {
       console.error('Error deleting items:', error)
       alert('Failed to delete items. Please try again.')
-    } finally {
-      setIsProcessing(false)
+      throw error
     }
+
+    await fetchData()
+    setSelectedItems(new Set())
   }
 
   const handleBulkMove = async () => {
@@ -630,32 +629,21 @@ export default function Items() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold mb-4">Confirm Delete</h3>
-            <p className="text-sm text-muted-foreground mb-6">
-              Are you sure you want to delete {selectedItems.size} item{selectedItems.size !== 1 ? 's' : ''}? This action can be undone from the audit log.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={isProcessing}
-                className="px-4 py-2 border rounded-md hover:bg-secondary transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={isProcessing}
-                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors text-sm disabled:opacity-50"
-              >
-                {isProcessing ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Items"
+        itemName={selectedItems.size === 1
+          ? items.find(item => selectedItems.has(item.id))?.name || 'Item'
+          : `${selectedItems.size} items`
+        }
+        itemType="item"
+        userEmail={user?.email || ''}
+        affectedData={{
+          items: items.filter(item => selectedItems.has(item.id))
+        }}
+      />
 
       {/* Move Location Modal */}
       {showMoveModal && (
