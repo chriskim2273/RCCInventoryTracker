@@ -428,7 +428,17 @@ export default function ItemDetail() {
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Location</p>
-                <p className="font-medium text-sm sm:text-base truncate" title={item.location?.path || 'Unknown'}>{item.location?.path || 'Unknown'}</p>
+                {item.location_id ? (
+                  <button
+                    onClick={() => navigate(`/locations/${item.location_id}`)}
+                    className="font-medium text-sm sm:text-base truncate text-left text-primary hover:underline"
+                    title={`Go to ${item.location?.path || 'location'}`}
+                  >
+                    {item.location?.path || 'Unknown'}
+                  </button>
+                ) : (
+                  <p className="font-medium text-sm sm:text-base truncate" title="Unknown">Unknown</p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <p className="text-xs sm:text-sm text-muted-foreground">Min Quantity Threshold</p>
