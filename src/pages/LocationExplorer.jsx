@@ -374,6 +374,12 @@ export default function LocationExplorer() {
     setDraggedItemId(item.id)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', item.id)
+
+    // Scroll to sub-locations section to show drop targets
+    const subLocationsSection = document.querySelector('[data-sublocation-section]')
+    if (subLocationsSection) {
+      subLocationsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
 
   const handleDragEnd = () => {
@@ -529,7 +535,7 @@ export default function LocationExplorer() {
       ) : (
         <>
           {childLocations.length > 0 && (
-            <div>
+            <div data-sublocation-section>
               <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Sub-Locations</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {childLocations.map((location) => (
