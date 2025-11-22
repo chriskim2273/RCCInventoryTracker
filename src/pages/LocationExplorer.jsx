@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import RelocationConfirmationModal from '@/components/RelocationConfirmationModal'
 
 export default function LocationExplorer() {
   const { locationId } = useParams()
@@ -27,6 +28,13 @@ export default function LocationExplorer() {
   })
   const [editingItemId, setEditingItemId] = useState(null)
   const [quantityInput, setQuantityInput] = useState('')
+  const [draggedItemId, setDraggedItemId] = useState(null)
+  const [dragOverLocationId, setDragOverLocationId] = useState(null)
+  const [showRelocationModal, setShowRelocationModal] = useState(false)
+  const [relocationData, setRelocationData] = useState({
+    item: null,
+    targetLocation: null,
+  })
   const { canEdit, isAdmin, user } = useAuth()
 
   useEffect(() => {
@@ -361,6 +369,71 @@ export default function LocationExplorer() {
     }
   }
 
+  // Drag and drop handlers
+  const handleDragStart = (e, item) => {
+    setDraggedItemId(item.id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', item.id)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null)
+    setDragOverLocationId(null)
+  }
+
+  const handleDragOver = (e, location) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverLocationId(location.id)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverLocationId(null)
+  }
+
+  const handleDrop = (e, targetLocation) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const itemId = e.dataTransfer.getData('text/plain')
+    const item = items.find((i) => i.id === itemId)
+
+    if (!item) return
+
+    // Don't allow dropping on the item's current location
+    if (item.location_id === targetLocation.id) {
+      setDraggedItemId(null)
+      setDragOverLocationId(null)
+      return
+    }
+
+    // Show confirmation modal
+    setRelocationData({
+      item: item,
+      targetLocation: targetLocation,
+    })
+    setShowRelocationModal(true)
+    setDraggedItemId(null)
+    setDragOverLocationId(null)
+  }
+
+  const confirmRelocation = async () => {
+    const { item, targetLocation } = relocationData
+
+    const { error } = await supabase
+      .from('items')
+      .update({ location_id: targetLocation.id })
+      .eq('id', item.id)
+
+    if (error) {
+      console.error('Error relocating item:', error)
+      throw error
+    }
+
+    // Refresh data to show updated item location
+    await fetchLocationData()
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {currentLocation?.image_url && (
@@ -463,7 +536,14 @@ export default function LocationExplorer() {
                   <div key={location.id} className="relative group">
                     <Link
                       to={`/locations/${location.id}`}
-                      className="block bg-card border rounded-lg p-4 sm:p-6 hover:border-primary transition-colors"
+                      onDragOver={(e) => canEdit && handleDragOver(e, location)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => canEdit && handleDrop(e, location)}
+                      className={`block bg-card border rounded-lg p-4 sm:p-6 hover:border-primary transition-colors ${
+                        dragOverLocationId === location.id
+                          ? 'border-green-500 border-2 bg-green-50 dark:bg-green-950'
+                          : ''
+                      }`}
                     >
                       {location.image_url && (
                         <div className="mb-3">
@@ -533,7 +613,12 @@ export default function LocationExplorer() {
                     <Link
                       key={item.id}
                       to={`/items/${item.id}`}
-                      className="bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative"
+                      draggable={canEdit}
+                      onDragStart={(e) => canEdit && handleDragStart(e, item)}
+                      onDragEnd={handleDragEnd}
+                      className={`bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative ${
+                        draggedItemId === item.id ? 'opacity-50' : ''
+                      }`}
                     >
                       {item.image_url && (
                         <div className="mb-3">
@@ -641,6 +726,15 @@ export default function LocationExplorer() {
         itemType={deleteModalData.type}
         userEmail={user?.email || ''}
         affectedData={deleteModalData.affectedData}
+      />
+
+      <RelocationConfirmationModal
+        isOpen={showRelocationModal}
+        onClose={() => setShowRelocationModal(false)}
+        onConfirm={confirmRelocation}
+        item={relocationData.item}
+        currentLocation={currentLocation}
+        targetLocation={relocationData.targetLocation}
       />
     </div>
   )

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
+import RelocationConfirmationModal from './RelocationConfirmationModal'
 import { Upload, X, AlertTriangle } from 'lucide-react'
 import imageCompression from 'browser-image-compression'
 
@@ -26,6 +27,9 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [duplicateWarning, setDuplicateWarning] = useState(null)
+  const [showRelocationModal, setShowRelocationModal] = useState(false)
+  const [originalLocationId, setOriginalLocationId] = useState(null)
+  const [pendingUpdateData, setPendingUpdateData] = useState(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -44,6 +48,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           description: item.description || '',
         })
         setImagePreview(item.image_url || null)
+        setOriginalLocationId(item.location_id || null)
       } else {
         setFormData({
           name: '',
@@ -58,10 +63,13 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           description: '',
         })
         setImagePreview(null)
+        setOriginalLocationId(null)
       }
       setImageFile(null)
       setError(null)
       setDuplicateWarning(null)
+      setShowRelocationModal(false)
+      setPendingUpdateData(null)
     }
   }, [isOpen, item, locationId])
 
@@ -197,6 +205,16 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
       }
 
+      // Check if we're editing an item and the location has changed
+      if (item && originalLocationId !== formData.location_id) {
+        // Store the pending update data and show confirmation modal
+        setPendingUpdateData(itemData)
+        setShowRelocationModal(true)
+        setLoading(false)
+        return
+      }
+
+      // Proceed with update/insert if no location change or creating new item
       if (item) {
         // Update existing item (don't update created_by)
         const { error: updateError } = await supabase
@@ -227,7 +245,31 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     }
   }
 
+  const confirmRelocation = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { error: updateError } = await supabase
+        .from('items')
+        .update(pendingUpdateData)
+        .eq('id', item.id)
+
+      if (updateError) throw updateError
+
+      onSuccess()
+      onClose()
+    } catch (err) {
+      console.error('Error relocating item:', err)
+      setError(err.message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} title={item ? 'Edit Item' : 'Add New Item'} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
@@ -433,5 +475,15 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         </div>
       </form>
     </Modal>
+
+    <RelocationConfirmationModal
+      isOpen={showRelocationModal}
+      onClose={() => setShowRelocationModal(false)}
+      onConfirm={confirmRelocation}
+      item={item}
+      currentLocation={locations.find(loc => loc.id === originalLocationId)}
+      targetLocation={locations.find(loc => loc.id === formData.location_id)}
+    />
+  </>
   )
 }
