@@ -320,8 +320,8 @@ export default function AdminPanel() {
             .limit(100),
           supabase
             .from('items')
-            .select('id, name')
-            .is('deleted_at', null),
+            .select('id, name'),
+            // Note: We fetch ALL items (including deleted) so audit trail can show names for deleted items
           supabase
             .from('users')
             .select('id, email, first_name, last_name')
