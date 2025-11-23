@@ -9,6 +9,7 @@ A modern, role-based inventory management application built with React, Vite, an
 - **Item Management**: Track unique items by serial number or bulk items by quantity
 - **Check-In/Check-Out System**: Track who has items checked out
 - **AI-Powered Search**: Natural language search using OpenRouter LLMs (optional)
+- **Admin Notifications**: Email alerts for new user signups (Gmail SMTP, opt-in)
 - **Advanced Filtering**: Filter by category, status, location with real-time updates
 - **Automatic Change Logs**: Every action is logged automatically
 - **Category Organization**: Group items by categories (Laptops, Mice, etc.)
@@ -199,12 +200,40 @@ See `supabase/migrations/001_initial_schema.sql` for full schema.
 - ✅ Delete items with confirmation
 - ✅ Full audit trail display in Admin panel
 
+## Admin Notification System
+
+The app includes an email notification system that alerts admins when new users sign up and need role assignment.
+
+### Features
+- ✅ **Gmail SMTP Integration**: Uses Gmail (port 465) via Supabase Edge Functions
+- ✅ **Opt-In by Default**: Notifications are OFF by default to respect admin inboxes
+- ✅ **Per-Admin Control**: Each admin manages their own notification preferences
+- ✅ **Professional Emails**: HTML-formatted emails with user details and direct links
+- ✅ **Audit Logging**: All notification attempts are logged
+
+### Setup
+
+See `supabase/SETUP.md` Section 8 for complete setup instructions.
+
+**Quick Start:**
+1. Use the same Gmail App Password from auth setup
+2. Set edge function secrets: `GMAIL_USERNAME`, `GMAIL_APP_PASSWORD`, `SITE_URL`
+3. Deploy the edge function: `supabase functions deploy notify-admin-new-user`
+4. Enable in Admin Panel → Settings → Toggle "New User Signups"
+
+### Managing Preferences
+
+Admins can toggle notifications on/off at any time:
+- Navigate to **Admin Panel** → **Settings** tab
+- Toggle **"New User Signups"** switch
+- Changes take effect immediately
+
 ## Future Enhancement Ideas
 
 ### Medium Priority
 - [ ] PDF export for reports
-- [ ] Email notifications for approvals
-- [ ] Low stock alerts
+- [ ] Email notifications for role changes
+- [ ] Low stock alerts via email
 - [ ] QR code generation for items
 - [ ] Mobile app version
 

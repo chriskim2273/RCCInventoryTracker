@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 import sbuLogo from '@/assets/white-star-outlined.svg'
 
 export default function Login() {
@@ -134,7 +135,7 @@ export default function Login() {
     }
 
     try {
-      const { error } = isSignUp
+      const { data, error } = isSignUp
         ? await signUp(email, password, firstName.trim(), lastName.trim())
         : await signIn(email, password)
 
@@ -143,6 +144,24 @@ export default function Login() {
       } else {
         if (isSignUp) {
           setError('Check your email to confirm your account. Note: The confirmation email may take a few minutes to arrive. Please check your spam folder if you don\'t see it.')
+
+          // Notify admins about new user signup
+          if (data?.user) {
+            try {
+              await supabase.functions.invoke('notify-admin-new-user', {
+                body: {
+                  userId: data.user.id,
+                  userEmail: email,
+                  firstName: firstName.trim(),
+                  lastName: lastName.trim()
+                }
+              })
+              // Don't show errors to user - notification failures shouldn't disrupt signup
+            } catch (notifyError) {
+              console.error('Failed to send admin notification:', notifyError)
+              // Silently fail - user signup was successful
+            }
+          }
         } else {
           navigate('/')
         }

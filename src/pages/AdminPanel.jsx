@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList } from 'lucide-react'
+import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
@@ -49,6 +49,10 @@ export default function AdminPanel() {
     user: null,
     newRole: null,
   })
+  const [notificationPreferences, setNotificationPreferences] = useState({
+    new_user_signup: false,
+  })
+  const [savingPreferences, setSavingPreferences] = useState(false)
   const { user: currentUser, canManageUsers } = useAuth()
 
   // Filter states
@@ -256,6 +260,34 @@ export default function AdminPanel() {
   useEffect(() => {
     fetchData()
   }, [activeTab])
+
+  // Fetch current user's notification preferences on mount
+  useEffect(() => {
+    const fetchNotificationPreferences = async () => {
+      if (!currentUser?.id) return
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('notification_preferences')
+          .eq('id', currentUser.id)
+          .single()
+
+        if (error) {
+          console.error('Error fetching notification preferences:', error)
+          return
+        }
+
+        if (data?.notification_preferences) {
+          setNotificationPreferences(data.notification_preferences)
+        }
+      } catch (error) {
+        console.error('Error fetching notification preferences:', error)
+      }
+    }
+
+    fetchNotificationPreferences()
+  }, [currentUser?.id])
 
   const fetchData = async () => {
     setLoading(true)
@@ -487,6 +519,34 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error updating user role:', error)
       throw error
+    }
+  }
+
+  // Update notification preferences for the current user
+  const updateNotificationPreferences = async (newPreferences) => {
+    if (!currentUser?.id) return
+
+    setSavingPreferences(true)
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ notification_preferences: newPreferences })
+        .eq('id', currentUser.id)
+
+      if (error) {
+        console.error('Error updating notification preferences:', error)
+        alert('Failed to update notification preferences. Please try again.')
+        return
+      }
+
+      setNotificationPreferences(newPreferences)
+      alert('Notification preferences updated successfully')
+    } catch (error) {
+      console.error('Error updating notification preferences:', error)
+      alert('Failed to update notification preferences. Please try again.')
+    } finally {
+      setSavingPreferences(false)
     }
   }
 
@@ -1012,6 +1072,17 @@ export default function AdminPanel() {
             <ClipboardList className="h-4 w-4" />
             <span className="hidden sm:inline">Checkout History</span>
             <span className="sm:hidden">Checkouts</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'settings'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-primary'
+              }`}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
           </button>
         </div>
       </div>
@@ -2260,6 +2331,115 @@ export default function AdminPanel() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              {/* Notification Settings */}
+              <div className="bg-card border rounded-lg overflow-hidden">
+                <div className="px-6 py-4 border-b bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold">Notification Preferences</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Manage your email notification settings
+                  </p>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {/* New User Signup Notification */}
+                  <div className="flex items-start justify-between gap-4 p-4 rounded-lg border bg-background hover:bg-muted/30 transition-colors">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-primary" />
+                        <label className="text-sm font-medium cursor-pointer">
+                          New User Signups
+                        </label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Receive an email notification when a new user signs up and is waiting for role assignment
+                      </p>
+                    </div>
+
+                    {/* Toggle Switch */}
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => {
+                          const newValue = !notificationPreferences.new_user_signup
+                          updateNotificationPreferences({
+                            ...notificationPreferences,
+                            new_user_signup: newValue
+                          })
+                        }}
+                        disabled={savingPreferences}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                          notificationPreferences.new_user_signup
+                            ? 'bg-primary'
+                            : 'bg-muted-foreground/30'
+                        } ${savingPreferences ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            notificationPreferences.new_user_signup
+                              ? 'translate-x-6'
+                              : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Info Box */}
+                  <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                          About Email Notifications
+                        </h4>
+                        <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                          Email notifications are sent using the configured email service. Notifications are off by default
+                          to respect your inbox. You can toggle them on or off at any time.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Current Status */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Current Status:</span>
+                      <span className={`font-medium ${notificationPreferences.new_user_signup ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {notificationPreferences.new_user_signup ? '✓ Notifications Enabled' : '✗ Notifications Disabled'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Future Settings Placeholder */}
+              <div className="bg-card border rounded-lg overflow-hidden opacity-60">
+                <div className="px-6 py-4 border-b bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold text-muted-foreground">Additional Settings</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    More settings coming soon
+                  </p>
+                </div>
+                <div className="p-6">
+                  <p className="text-sm text-muted-foreground italic">
+                    Additional admin settings and preferences will be available here in future updates.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </>

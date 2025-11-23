@@ -158,7 +158,115 @@ If it succeeds, your Supabase project is now ready to send authentication and ma
 - Use this setup for development or low-volume apps.
 - For production, consider Mailgun, SendGrid, or Brevo.
 
-## 8. Seed Initial Data (Optional)
+---
+
+## 8. Configure Admin Notification Settings
+
+### Enable Email Notifications for New User Signups
+
+The system includes email notifications that alert admins when new users sign up and need role assignment.
+
+#### Prerequisites
+- Gmail SMTP configured (Step 7 above)
+- App Password generated for your Gmail account
+
+#### Setup Admin Notification Edge Function
+
+1. **Set Edge Function Secrets**:
+   ```bash
+   # Use the same Gmail credentials from Step 7
+   supabase secrets set GMAIL_USERNAME=your-email@gmail.com
+   supabase secrets set GMAIL_APP_PASSWORD=your-16-char-app-password
+
+   # Set your application URL
+   supabase secrets set SITE_URL=https://your-app-url.com
+
+   # Verify secrets are set
+   supabase secrets list
+   ```
+
+2. **Deploy the Notification Edge Function**:
+   ```bash
+   # Deploy the notify-admin-new-user function
+   supabase functions deploy notify-admin-new-user
+
+   # Check deployment status
+   supabase functions list
+   ```
+
+3. **Enable Notifications in Admin Panel**:
+   - Log in as an admin user
+   - Navigate to **Admin Panel** → **Settings** tab
+   - Toggle **"New User Signups"** to **ON**
+   - You'll see a confirmation message
+
+#### How It Works
+
+When a new user signs up:
+1. User record is created with `role = 'pending'`
+2. Frontend triggers the `notify-admin-new-user` edge function
+3. Function queries for admins with notifications enabled
+4. Emails are sent via Gmail SMTP (port 465) to opted-in admins
+5. Notification attempt is logged in audit_logs
+
+#### Email Template
+
+Admins receive a professional HTML email containing:
+- New user's name and email address
+- Status indicator (Pending Role Assignment)
+- Direct link to the Admin Panel
+- Opt-out instructions in footer
+
+#### Notification Preferences
+
+**Default Behavior**: Notifications are **OFF by default** to respect admin inboxes.
+
+**Per-Admin Control**: Each admin can individually toggle notifications on/off in **Admin Panel → Settings**.
+
+**Database Storage**: Preferences are stored in the `notification_preferences` JSONB column:
+```sql
+-- View admin notification preferences
+SELECT email, notification_preferences->>'new_user_signup' as notifications_enabled
+FROM users
+WHERE role = 'admin';
+```
+
+#### Testing
+
+Test the notification system:
+
+```bash
+# Test the edge function directly
+supabase functions invoke notify-admin-new-user \
+  --body '{"userId":"test-id","userEmail":"test@stonybrook.edu","firstName":"Test","lastName":"User"}'
+
+# Monitor logs
+supabase functions logs notify-admin-new-user --tail
+```
+
+Then sign up with a test user and verify the admin receives an email.
+
+#### Troubleshooting
+
+**No emails received:**
+- Verify `GMAIL_USERNAME` and `GMAIL_APP_PASSWORD` secrets are set correctly
+- Check that at least one admin has enabled notifications in Settings
+- Review edge function logs: `supabase functions logs notify-admin-new-user`
+- Verify Gmail App Password is valid (not your regular password)
+
+**Emails going to spam:**
+- Use a dedicated Gmail account for notifications
+- Consider using Google Workspace for better deliverability
+- Add SPF records for your domain
+
+**Function errors:**
+- Check Supabase Dashboard → Edge Functions for deployment status
+- Ensure port 465 outbound connections are allowed (they are as of 2024)
+- Verify the database migration `018_add_admin_notification_preferences.sql` was applied
+
+---
+
+## 9. Seed Initial Data (Optional)
 
 Create some initial categories:
 
