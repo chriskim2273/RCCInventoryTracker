@@ -179,7 +179,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     setError(null)
 
     try {
-      let imageUrl = item?.image_url || null
+      let imageUrl = null
 
       // Upload image if new file selected
       if (imageFile) {
@@ -196,7 +196,11 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           .getPublicUrl(fileName)
 
         imageUrl = publicUrl
+      } else if (imagePreview) {
+        // Keep existing image if preview is showing (user didn't remove it)
+        imageUrl = item?.image_url || null
       }
+      // else: imageUrl stays null (user removed the image)
 
       const itemData = {
         ...formData,
@@ -288,7 +292,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
                   {duplicateWarning.count} other item{duplicateWarning.count > 1 ? 's' : ''} with the name "{formData.name}" already exist{duplicateWarning.count === 1 ? 's' : ''} in this location:
                 </p>
                 <ul className="mt-2 space-y-1 text-xs">
-                  {duplicateWarning.items.map((item, idx) => (
+                  {duplicateWarning.items.map((item) => (
                     <li key={item.id} className="ml-4">
                       • {item.name}{item.serial_number ? ` (SN: ${item.serial_number})` : ''}
                     </li>
