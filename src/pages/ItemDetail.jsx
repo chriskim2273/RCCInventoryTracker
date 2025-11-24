@@ -199,7 +199,7 @@ export default function ItemDetail() {
 
 
   const handleQuantityChange = async (delta) => {
-    if (!item || item.is_unique) return
+    if (!item || item.is_unique || item.quantity === null) return
 
     const newQuantity = Math.max(0, item.quantity + delta)
 
@@ -223,7 +223,7 @@ export default function ItemDetail() {
   }
 
   const startEditingQuantity = () => {
-    if (!canEdit || item.is_unique) return
+    if (!canEdit || item.is_unique || item.quantity === null) return
     setQuantityInput(String(item.quantity))
     setEditingQuantity(true)
   }
@@ -703,13 +703,13 @@ export default function ItemDetail() {
               ) : (
                 <span
                   onClick={startEditingQuantity}
-                  className={`text-2xl sm:text-3xl font-bold ${canEdit && !item.is_unique ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
-                  title={canEdit && !item.is_unique ? 'Click to edit quantity' : ''}
+                  className={`text-2xl sm:text-3xl font-bold ${canEdit && !item.is_unique && item.quantity !== null ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                  title={canEdit && !item.is_unique && item.quantity !== null ? 'Click to edit quantity' : ''}
                 >
-                  {item.quantity}
+                  {item.quantity === null ? 'Unknown' : item.quantity}
                 </span>
               )}
-              {!item.is_unique && canEdit && !editingQuantity && (
+              {!item.is_unique && canEdit && !editingQuantity && item.quantity !== null && (
                 <div className="flex gap-1.5 sm:gap-2">
                   <button
                     onClick={() => handleQuantityChange(-1)}
@@ -732,7 +732,10 @@ export default function ItemDetail() {
             {item.is_unique && (
               <p className="text-xs text-muted-foreground">This is a unique item</p>
             )}
-            {!item.is_unique && canEdit && (
+            {item.quantity === null && (
+              <p className="text-xs text-muted-foreground">Quantity is unknown. Edit this item to set a quantity.</p>
+            )}
+            {!item.is_unique && item.quantity !== null && canEdit && (
               <p className="text-xs text-muted-foreground">Click number to set value, or use +/- buttons</p>
             )}
           </div>
@@ -746,7 +749,10 @@ export default function ItemDetail() {
               let bgColor = 'bg-green-100 dark:bg-green-900/30'
               let textColor = 'text-green-800 dark:text-green-200'
 
-              if (status === 'out_of_stock') {
+              if (status === 'unknown_quantity') {
+                bgColor = 'bg-gray-100 dark:bg-gray-900/30'
+                textColor = 'text-gray-800 dark:text-gray-200'
+              } else if (status === 'out_of_stock') {
                 bgColor = 'bg-red-100 dark:bg-red-900/30'
                 textColor = 'text-red-800 dark:text-red-200'
               } else if (status === 'fully_checked_out') {
@@ -794,7 +800,7 @@ export default function ItemDetail() {
                   )}
 
                   <div className="flex gap-2">
-                    {canEdit && availability.availableQuantity > 0 && (
+                    {canEdit && (availability.availableQuantity > 0 || status === 'unknown_quantity') && (
                       <button
                         onClick={() => setShowCheckoutModal(true)}
                         className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
@@ -812,7 +818,7 @@ export default function ItemDetail() {
                         Check In
                       </button>
                     )}
-                    {canEdit && availability.availableQuantity === 0 && activeCheckouts.length === 0 && (
+                    {canEdit && availability.availableQuantity === 0 && activeCheckouts.length === 0 && status !== 'unknown_quantity' && (
                       <button
                         disabled
                         className="flex-1 flex items-center justify-center gap-2 bg-muted text-muted-foreground px-4 py-2 rounded-md cursor-not-allowed opacity-50"

@@ -20,6 +20,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     location_id: locationId || '',
     description: '',
   })
+  const [unknownQuantity, setUnknownQuantity] = useState(false)
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [categories, setCategories] = useState([])
@@ -35,6 +36,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     if (isOpen) {
       fetchOptions()
       if (item) {
+        const isQuantityUnknown = item.quantity === null
         setFormData({
           name: item.name || '',
           brand: item.brand || '',
@@ -47,6 +49,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           location_id: item.location_id || '',
           description: item.description || '',
         })
+        setUnknownQuantity(isQuantityUnknown)
         setImagePreview(item.image_url || null)
         setOriginalLocationId(item.location_id || null)
       } else {
@@ -62,6 +65,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           location_id: locationId || '',
           description: '',
         })
+        setUnknownQuantity(false)
         setImagePreview(null)
         setOriginalLocationId(null)
       }
@@ -205,7 +209,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
       const itemData = {
         ...formData,
         image_url: imageUrl,
-        quantity: parseInt(formData.quantity),
+        quantity: unknownQuantity ? null : parseInt(formData.quantity),
         min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
       }
 
@@ -358,16 +362,30 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
             />
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">Quantity *</label>
-            <input
-              type="number"
-              required
-              min="0"
-              value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md bg-background"
-            />
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <input
+                  type="number"
+                  required={!unknownQuantity}
+                  disabled={unknownQuantity}
+                  min="0"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md bg-background disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={unknownQuantity}
+                  onChange={(e) => setUnknownQuantity(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <span className="text-sm font-medium">Unknown</span>
+              </label>
+            </div>
           </div>
 
           <div>

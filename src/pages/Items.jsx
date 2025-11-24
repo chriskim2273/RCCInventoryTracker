@@ -61,7 +61,7 @@ const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
         </div>
         <div>
           <span className="text-muted-foreground">Quantity:</span>
-          <div className="font-medium mt-0.5">{item.quantity}</div>
+          <div className="font-medium mt-0.5">{item.quantity === null ? 'Unknown' : item.quantity}</div>
         </div>
         <div className="col-span-2">
           <span className="text-muted-foreground">Location:</span>
@@ -148,7 +148,7 @@ const DesktopItemRow = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
         </span>
       </td>
       <td className="px-4 py-3 text-sm">{item.location?.path || 'Unknown'}</td>
-      <td className="px-4 py-3 text-sm">{item.quantity}</td>
+      <td className="px-4 py-3 text-sm">{item.quantity === null ? 'Unknown' : item.quantity}</td>
       <td className="px-4 py-3">
         {(() => {
           const status = getItemStatus(item, item.availableQuantity, item.checkedOutQuantity)
@@ -375,7 +375,7 @@ export default function Items() {
 
     // Filter by status
     if (selectedStatus === 'available') {
-      filtered = filtered.filter((item) => item.checkedOutQuantity === 0 && item.quantity > 0)
+      filtered = filtered.filter((item) => item.checkedOutQuantity === 0 && item.quantity !== null && item.quantity > 0)
     } else if (selectedStatus === 'checked_out') {
       filtered = filtered.filter((item) => item.checkedOutQuantity > 0)
     }
@@ -434,8 +434,8 @@ export default function Items() {
         item.name,
         item.brand || '',
         item.serial_number || '',
-        item.quantity,
-        item.availableQuantity,
+        item.quantity === null ? 'Unknown' : item.quantity,
+        item.availableQuantity === null ? 'N/A' : item.availableQuantity,
         item.checkedOutQuantity,
         item.category?.name || '',
         item.location?.path || '',
