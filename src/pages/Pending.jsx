@@ -1,9 +1,18 @@
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Clock } from 'lucide-react'
 import sbuLogo from '@/assets/white-star-outlined.svg'
 
 export default function Pending() {
-  const { signOut, user } = useAuth()
+  const { signOut, user, loading } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login')
+    }
+  }, [user, loading, navigate])
 
   const handleSignOut = async () => {
     await signOut()
