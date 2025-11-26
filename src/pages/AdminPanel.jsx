@@ -231,7 +231,8 @@ export default function AdminPanel() {
       const query = checkoutSearchQuery.toLowerCase()
       filtered = filtered.filter(log =>
         log.item?.name?.toLowerCase().includes(query) ||
-        log.checked_out_to?.toLowerCase().includes(query)
+        log.checked_out_to?.toLowerCase().includes(query) ||
+        log.reservation_id?.toLowerCase().includes(query)
       )
     }
 
@@ -2289,10 +2290,15 @@ export default function AdminPanel() {
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <div>
-                                  <p className="font-medium">{log.checked_out_to}</p>
+                                <div className="max-w-[200px] truncate">
+                                  <p className="font-medium truncate" title={log.checked_out_to || `Reservation: ${log.reservation_id}`}>
+                                    {log.checked_out_to || <span className="font-normal">Reservation: {log.reservation_id}</span>}
+                                  </p>
+                                  {log.checked_out_to && log.reservation_id && (
+                                    <p className="text-xs text-muted-foreground truncate">ID: {log.reservation_id}</p>
+                                  )}
                                   {log.checked_out_to_user && (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground truncate">
                                       {getUserDisplayName(log.checked_out_to_user)}
                                     </p>
                                   )}

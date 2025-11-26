@@ -10,6 +10,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
   const [formData, setFormData] = useState({
     checked_out_to: '',
     checked_out_to_user_id: '',
+    reservation_id: '',
     use_registered_user: false,
     checked_out_at: new Date().toISOString().slice(0, 16),
     quantity: 1,
@@ -25,6 +26,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
       setFormData({
         checked_out_to: '',
         checked_out_to_user_id: '',
+        reservation_id: '',
         use_registered_user: false,
         checked_out_at: new Date().toISOString().slice(0, 16),
         quantity: 1,
@@ -105,13 +107,22 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
         throw new Error(`Only ${availableQuantity} units available`)
       }
 
+      // Validate recipient (Name OR Reservation ID)
+      if (!formData.use_registered_user && !formData.checked_out_to?.trim() && !formData.reservation_id?.trim()) {
+        throw new Error('Please provide either a Name or a Reservation ID')
+      }
+      if (formData.use_registered_user && !formData.checked_out_to_user_id) {
+        throw new Error('Please select a user')
+      }
+
       // Create checkout log entry
       const { error: logError } = await supabase
         .from('checkout_logs')
         .insert([{
           item_id: item.id,
-          checked_out_to: formData.checked_out_to,
+          checked_out_to: formData.checked_out_to || null,
           checked_out_to_user_id: formData.checked_out_to_user_id || null,
+          reservation_id: formData.reservation_id || null,
           checked_out_at: formData.checked_out_at,
           quantity_checked_out: checkoutQty,
           checkout_notes: formData.notes || null,
@@ -204,14 +215,25 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
                 ))}
               </select>
             ) : (
-              <input
-                type="text"
-                required
-                value={formData.checked_out_to}
-                onChange={(e) => setFormData({ ...formData, checked_out_to: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-                placeholder="Enter person's name (e.g., John Doe, Room 305)"
-              />
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={formData.checked_out_to}
+                  onChange={(e) => setFormData({ ...formData, checked_out_to: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  placeholder="Enter person's name (e.g., John Doe, Room 305)"
+                />
+                <input
+                  type="text"
+                  value={formData.reservation_id}
+                  onChange={(e) => setFormData({ ...formData, reservation_id: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  placeholder="Enter Reservation ID (optional)"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Please provide a Name, a Reservation ID, or both.
+                </p>
+              </div>
             )}
           </div>
         </div>
