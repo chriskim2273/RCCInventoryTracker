@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     // Check if the user is an admin
     const { data: userData, error: roleError } = await adminClient
       .from('users')
-      .select('role')
+      .select('role, first_name, last_name, email')
       .eq('id', user.id)
       .single()
 
@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
     // Log the admin action
     await adminClient.from('audit_logs').insert({
       user_id: user.id,
+      user_name: userData.first_name && userData.last_name ? `${userData.first_name} ${userData.last_name}` : userData.email,
       action: 'resend_confirmation',
       details: { email },
     })

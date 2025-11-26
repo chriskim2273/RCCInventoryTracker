@@ -116,6 +116,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
           quantity_checked_out: checkoutQty,
           checkout_notes: formData.notes || null,
           performed_by: user.id,
+          performed_by_name: user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.email,
         }])
 
       if (logError) throw logError

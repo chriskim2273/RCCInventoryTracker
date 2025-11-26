@@ -78,7 +78,8 @@ export default function AdminPanel() {
     return String(value)
   }
 
-  const getUserDisplayName = (user) => {
+  const getUserDisplayName = (user, fallbackName = null) => {
+    if (fallbackName) return fallbackName
     if (!user) return 'Unknown User'
     if (user.first_name && user.last_name) {
       return `${user.first_name} ${user.last_name}`
@@ -314,6 +315,7 @@ export default function AdminPanel() {
             .from('items')
             .select(`
               *,
+              *,
               category:categories(name),
               location:locations(name, path)
             `)
@@ -353,7 +355,7 @@ export default function AdminPanel() {
           supabase
             .from('items')
             .select('id, name'),
-            // Note: We fetch ALL items (including deleted) so audit trail can show names for deleted items
+          // Note: We fetch ALL items (including deleted) so audit trail can show names for deleted items
           supabase
             .from('users')
             .select('id, email, first_name, last_name')
@@ -396,6 +398,7 @@ export default function AdminPanel() {
           supabase
             .from('items')
             .select(`
+              *,
               *,
               category:categories(name),
               location:locations(name)
@@ -496,9 +499,10 @@ export default function AdminPanel() {
 
       // Log the role change in admin audit logs
       const { error: auditError } = await supabase
-        .from('admin_audit_logs')
+        .from('audit_logs')
         .insert({
           admin_id: currentUser.id,
+          user_name: getUserDisplayName(currentUser),
           action: 'role_change',
           target_user_id: user.id,
           details: {
@@ -686,6 +690,7 @@ export default function AdminPanel() {
         .update({
           deleted_at: new Date().toISOString(),
           deleted_by: currentUser?.id,
+          deleted_by_name: getUserDisplayName(currentUser),
         })
         .eq('id', id)
 
@@ -705,6 +710,7 @@ export default function AdminPanel() {
         .update({
           deleted_at: new Date().toISOString(),
           deleted_by: currentUser?.id,
+          deleted_by_name: getUserDisplayName(currentUser),
         })
         .eq('id', id)
 
@@ -712,6 +718,7 @@ export default function AdminPanel() {
         // Log to admin audit logs
         await supabase.from('audit_logs').insert({
           user_id: currentUser?.id,
+          user_name: getUserDisplayName(currentUser),
           action: 'delete_location',
           details: {
             location_name: locationData?.name || name,
@@ -740,6 +747,7 @@ export default function AdminPanel() {
         .update({
           deleted_at: new Date().toISOString(),
           deleted_by: currentUser?.id,
+          deleted_by_name: getUserDisplayName(currentUser),
         })
         .eq('id', id)
 
@@ -771,6 +779,7 @@ export default function AdminPanel() {
       // Log to admin audit logs
       await supabase.from('audit_logs').insert({
         user_id: currentUser?.id,
+        user_name: getUserDisplayName(currentUser),
         action: 'restore_item',
         details: {
           item_name: itemData?.name,
@@ -804,6 +813,7 @@ export default function AdminPanel() {
       // Log to admin audit logs
       await supabase.from('audit_logs').insert({
         user_id: currentUser?.id,
+        user_name: getUserDisplayName(currentUser),
         action: 'restore_location',
         details: {
           location_name: locationData?.name,
@@ -837,6 +847,7 @@ export default function AdminPanel() {
       // Log to admin audit logs
       await supabase.from('audit_logs').insert({
         user_id: currentUser?.id,
+        user_name: getUserDisplayName(currentUser),
         action: 'restore_category',
         details: {
           category_name: categoryData?.name,
@@ -922,6 +933,7 @@ export default function AdminPanel() {
         // Log to admin audit logs
         await supabase.from('audit_logs').insert({
           user_id: currentUser?.id,
+          user_name: getUserDisplayName(currentUser),
           action: 'hard_delete_item',
           details: {
             item_name: name,
@@ -942,6 +954,7 @@ export default function AdminPanel() {
         // Log to admin audit logs
         await supabase.from('audit_logs').insert({
           user_id: currentUser?.id,
+          user_name: getUserDisplayName(currentUser),
           action: 'hard_delete_location',
           details: {
             location_name: name,
@@ -962,6 +975,7 @@ export default function AdminPanel() {
         // Log to admin audit logs
         await supabase.from('audit_logs').insert({
           user_id: currentUser?.id,
+          user_name: getUserDisplayName(currentUser),
           action: 'hard_delete_category',
           details: {
             category_name: name,
@@ -985,8 +999,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('users')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'users'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <Users className="h-4 w-4" />
@@ -996,8 +1010,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('items')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'items'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <Package className="h-4 w-4" />
@@ -1007,8 +1021,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('locations')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'locations'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <MapPin className="h-4 w-4" />
@@ -1018,8 +1032,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('categories')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'categories'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <Tag className="h-4 w-4" />
@@ -1029,8 +1043,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('audit')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'audit'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <History className="h-4 w-4" />
@@ -1041,8 +1055,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('admin-audit')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'admin-audit'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <Shield className="h-4 w-4" />
@@ -1053,8 +1067,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('deleted')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'deleted'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <Trash2 className="h-4 w-4" />
@@ -1065,8 +1079,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('checkout-history')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'checkout-history'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <ClipboardList className="h-4 w-4" />
@@ -1077,8 +1091,8 @@ export default function AdminPanel() {
           <button
             onClick={() => setActiveTab('settings')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'settings'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-primary'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:text-primary'
               }`}
           >
             <Settings className="h-4 w-4" />
@@ -1140,14 +1154,14 @@ export default function AdminPanel() {
                         <td className="px-4 py-3">
                           <span
                             className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                : user.role === 'coordinator'
-                                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
-                                  : user.role === 'editor'
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                    : user.role === 'viewer'
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                              : user.role === 'coordinator'
+                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+                                : user.role === 'editor'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  : user.role === 'viewer'
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
                               }`}
                           >
                             {user.role}
@@ -1280,7 +1294,7 @@ export default function AdminPanel() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                        <td className="px-4 py-3 text-sm">{getUserDisplayName(item.created_by_user)}</td>
+                        <td className="px-4 py-3 text-sm">{getUserDisplayName(item.created_by_user, item.created_by_name)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button
@@ -1538,14 +1552,14 @@ export default function AdminPanel() {
                           <div className="flex items-center gap-3 mb-2">
                             <span
                               className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium capitalize ${log.action === 'create'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : log.action === 'update'
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                    : log.action === 'soft_delete'
-                                      ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                                      : log.action === 'restore'
-                                        ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
-                                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : log.action === 'update'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  : log.action === 'soft_delete'
+                                    ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                                    : log.action === 'restore'
+                                      ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                 }`}
                             >
                               {log.action.replace('_', ' ')}
@@ -1559,7 +1573,7 @@ export default function AdminPanel() {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {new Date(log.timestamp).toLocaleString()} • {getUserDisplayName(log.user)}
+                            {new Date(log.timestamp).toLocaleString()} • {getUserDisplayName(log.user, log.user_name)}
                           </p>
                         </div>
                       </div>
@@ -1733,20 +1747,33 @@ export default function AdminPanel() {
                               {log.action === 'hard_delete_category' && 'Category Permanently Deleted'}
                               {log.action === 'bulk_delete' && 'Bulk Deletion'}
                               {log.action === 'delete_user' && 'User Deletion'}
+                              {log.action === 'new_user_notification_sent' && 'New User Notification Sent'}
                               {log.action === 'resend_confirmation' && 'Resend Confirmation Email'}
                               {log.action.includes('reset_password') && 'Password Reset'}
                               {log.action.includes('update_email') && 'Email Update'}
-                              {!['delete_location', 'restore_location', 'hard_delete_location', 'restore_item', 'hard_delete_item', 'restore_category', 'hard_delete_category', 'bulk_delete', 'delete_user', 'resend_confirmation'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
+                              {!['delete_location', 'restore_location', 'hard_delete_location', 'restore_item', 'hard_delete_item', 'restore_category', 'hard_delete_category', 'bulk_delete', 'delete_user', 'resend_confirmation', 'new_user_notification_sent'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
                             </h3>
                             <p className="text-sm text-muted-foreground">
                               {new Date(log.created_at).toLocaleString()}
                             </p>
                             <p className="text-sm font-medium mt-1">
-                              Admin: {getUserDisplayName(log.user)}
+                              Admin: {getUserDisplayName(log.user, log.user_name)}
                             </p>
-                            {log.details?.email && (
+                            {(log.details?.email || log.details?.user_email || log.details?.new_user_email) && (
                               <p className="text-sm text-muted-foreground mt-1">
-                                Target: {log.details.email}
+                                {log.action === 'delete_user' ? (
+                                  <span>
+                                    Target: <span className="font-medium">{log.details.user_name || log.details.email}</span>
+                                    {log.details.user_name && log.details.email && <span className="text-muted-foreground font-normal"> ({log.details.email})</span>}
+                                  </span>
+                                ) : log.action === 'new_user_notification_sent' ? (
+                                  <span>
+                                    New User: <span className="font-medium">{log.details.new_user_name || log.details.new_user_email}</span>
+                                    {log.details.new_user_name && log.details.new_user_email && <span className="text-muted-foreground font-normal"> ({log.details.new_user_email})</span>}
+                                  </span>
+                                ) : (
+                                  `Target: ${log.details.email || log.details.user_email || log.details.new_user_email}`
+                                )}
                               </p>
                             )}
                             {(log.details?.item_name || log.details?.location_name || log.details?.category_name) && (
@@ -1759,11 +1786,10 @@ export default function AdminPanel() {
                             )}
                           </div>
                         </div>
-                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
-                          log.action.startsWith('restore_')
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${log.action.startsWith('restore_')
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}>
                           {log.action.replace('_', ' ').toUpperCase()}
                         </span>
                       </div>
@@ -1973,7 +1999,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(item.deleted_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm">{getUserDisplayName(item.deleted_by_user)}</td>
+                              <td className="px-4 py-3 text-sm">{getUserDisplayName(item.deleted_by_user, item.deleted_by_name)}</td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
                                   <button
@@ -2033,7 +2059,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(location.deleted_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm">{getUserDisplayName(location.deleted_by_user)}</td>
+                              <td className="px-4 py-3 text-sm">{getUserDisplayName(location.deleted_by_user, location.deleted_by_name)}</td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
                                   <button
@@ -2089,7 +2115,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 text-sm text-muted-foreground">
                                 {new Date(category.deleted_at).toLocaleString()}
                               </td>
-                              <td className="px-4 py-3 text-sm">{getUserDisplayName(category.deleted_by_user)}</td>
+                              <td className="px-4 py-3 text-sm">{getUserDisplayName(category.deleted_by_user, category.deleted_by_name)}</td>
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-3">
                                   <button
@@ -2292,19 +2318,18 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-4 py-3">
                                 <span
-                                  className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                    isActive
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                      : isPartialReturn
+                                  className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${isActive
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                    : isPartialReturn
                                       ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                       : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  }`}
+                                    }`}
                                 >
                                   {isActive ? 'Active' : isPartialReturn ? 'Partial Return' : 'Returned'}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-sm">
-                                {getUserDisplayName(log.performed_by_user)}
+                                {getUserDisplayName(log.performed_by_user, log.performed_by_name)}
                               </td>
                               <td className="px-4 py-3 text-sm max-w-xs">
                                 {log.checkout_notes && (
@@ -2374,18 +2399,16 @@ export default function AdminPanel() {
                           })
                         }}
                         disabled={savingPreferences}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                          notificationPreferences.new_user_signup
-                            ? 'bg-primary'
-                            : 'bg-muted-foreground/30'
-                        } ${savingPreferences ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${notificationPreferences.new_user_signup
+                          ? 'bg-primary'
+                          : 'bg-muted-foreground/30'
+                          } ${savingPreferences ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            notificationPreferences.new_user_signup
-                              ? 'translate-x-6'
-                              : 'translate-x-1'
-                          }`}
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationPreferences.new_user_signup
+                            ? 'translate-x-6'
+                            : 'translate-x-1'
+                            }`}
                         />
                       </button>
                     </div>

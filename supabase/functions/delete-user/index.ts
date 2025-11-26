@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     // Check if the user is an admin
     const { data: userData, error: roleError } = await adminClient
       .from('users')
-      .select('role')
+      .select('role, first_name, last_name, email')
       .eq('id', user.id)
       .single()
 
@@ -74,6 +74,17 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Get the target user's details before deletion for logging
+    const { data: targetUserData, error: targetUserError } = await adminClient
+      .from('users')
+      .select('email, first_name, last_name')
+      .eq('id', userId)
+      .single()
+
+    if (targetUserError) {
+      console.warn(`Could not fetch details for user ${userId} before deletion:`, targetUserError)
+    }
+
     // Delete the user from auth.users (this will cascade to the users table)
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
 
@@ -87,8 +98,17 @@ Deno.serve(async (req) => {
     // Log the admin action
     await adminClient.from('audit_logs').insert({
       user_id: user.id,
+      user_name: userData.first_name && userData.last_name ? `${userData.first_name} ${userData.last_name}` : userData.email,
       action: 'delete_user',
-      details: { deleted_user_id: userId },
+      details: {
+        deleted_user_id: userId,
+        email: targetUserData?.email,
+        first_name: targetUserData?.first_name,
+        last_name: targetUserData?.last_name,
+        user_name: targetUserData?.first_name && targetUserData?.last_name
+          ? `${targetUserData.first_name} ${targetUserData.last_name}`
+          : targetUserData?.email
+      },
     })
 
     return new Response(

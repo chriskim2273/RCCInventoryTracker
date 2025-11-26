@@ -212,6 +212,7 @@ You can manage your notification preferences in the Admin Panel.
 
     // Log the notification in audit_logs
     await adminClient.from('audit_logs').insert({
+      user_name: 'System',
       action: 'new_user_notification_sent',
       details: {
         new_user_email: userEmail,
