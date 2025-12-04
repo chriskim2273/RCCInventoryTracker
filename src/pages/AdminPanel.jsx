@@ -433,7 +433,7 @@ export default function AdminPanel() {
               *,
               *,
               category:categories(name),
-              location:locations(name)
+              location:locations(name, path)
             `)
             .not('deleted_at', 'is', null)
             .order('deleted_at', { ascending: false }),
@@ -2152,9 +2152,9 @@ export default function AdminPanel() {
                                 ) : 'N/A'}
                               </td>
                               <td className="px-4 py-3 text-sm">
-                                {item.location?.name ? (
-                                  <Link to={`/locations/${item.location.id}`} className="text-primary hover:underline">
-                                    {item.location.name}
+                                {item.location ? (
+                                  <Link to={`/locations/${item.location_id}`} className="text-primary hover:underline">
+                                    {item.location.path || item.location.name}
                                   </Link>
                                 ) : 'N/A'}
                               </td>

@@ -16,7 +16,7 @@ const FUSE_OPTIONS = {
     { name: 'serial_number', weight: 0.8 },
     { name: 'stony_brook_asset_tag', weight: 0.5 },
   ],
-  threshold: 0.4,
+  threshold: 0.3,
   ignoreLocation: true,
   includeScore: true,
   minMatchCharLength: 2,
