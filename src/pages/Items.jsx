@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Package, CheckCircle, Trash2, MapPin, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
+import { fuzzySearchItems } from '@/lib/fuzzySearch'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 import SearchBar from '@/components/SearchBar'
 import { aiSearch } from '@/lib/aiSearch'
@@ -349,22 +350,14 @@ export default function Items() {
   const filterItems = () => {
     let filtered = [...items]
 
-    // Filter by search query (AI or regular)
+    // Filter by search query (AI or fuzzy)
     if (searchQuery) {
       if (useAiSearch && aiMatchingIds.length > 0) {
         // Use AI search results
         filtered = filtered.filter((item) => aiMatchingIds.includes(item.id))
       } else if (!useAiSearch) {
-        // Use regular search
-        const query = searchQuery.toLowerCase()
-        filtered = filtered.filter(
-          (item) =>
-            item.name?.toLowerCase().includes(query) ||
-            item.brand?.toLowerCase().includes(query) ||
-            item.model?.toLowerCase().includes(query) ||
-            item.serial_number?.toLowerCase().includes(query) ||
-            item.stony_brook_asset_tag?.toLowerCase().includes(query)
-        )
+        // Use fuzzy search (searches name, description, brand, model, serial_number, asset tag)
+        filtered = fuzzySearchItems(filtered, searchQuery)
       }
     }
 
