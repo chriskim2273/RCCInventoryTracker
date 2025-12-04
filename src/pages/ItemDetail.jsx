@@ -409,6 +409,13 @@ export default function ItemDetail() {
               </div>
             )}
 
+            {item.description && (
+              <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-border">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Description</p>
+                <p className="text-sm sm:text-base whitespace-pre-wrap">{item.description}</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Brand</p>

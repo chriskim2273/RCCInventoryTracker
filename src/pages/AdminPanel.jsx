@@ -71,6 +71,10 @@ export default function AdminPanel() {
   const [checkoutStatusFilter, setCheckoutStatusFilter] = useState('all')
   const [checkoutPerformedByFilter, setCheckoutPerformedByFilter] = useState('all')
 
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState('all')
+  const [userStatusFilter, setUserStatusFilter] = useState('all')
+
   const formatValue = (value) => {
     if (value === null || value === undefined) return 'null'
     if (typeof value === 'boolean') return value ? 'true' : 'false'
@@ -88,6 +92,33 @@ export default function AdminPanel() {
   }
 
   // Filtered data using useMemo
+  const filteredUsers = useMemo(() => {
+    let filtered = [...users]
+
+    if (userSearchQuery) {
+      const query = userSearchQuery.toLowerCase()
+      filtered = filtered.filter(user =>
+        user.email?.toLowerCase().includes(query) ||
+        user.first_name?.toLowerCase().includes(query) ||
+        user.last_name?.toLowerCase().includes(query)
+      )
+    }
+
+    if (userRoleFilter !== 'all') {
+      filtered = filtered.filter(user => user.role === userRoleFilter)
+    }
+
+    if (userStatusFilter !== 'all') {
+      if (userStatusFilter === 'verified') {
+        filtered = filtered.filter(user => user.confirmed)
+      } else if (userStatusFilter === 'unverified') {
+        filtered = filtered.filter(user => !user.confirmed)
+      }
+    }
+
+    return filtered
+  }, [users, userSearchQuery, userRoleFilter, userStatusFilter])
+
   const filteredAuditLogs = useMemo(() => {
     let filtered = [...auditLogs]
 
@@ -1107,7 +1138,129 @@ export default function AdminPanel() {
       ) : (
         <>
           {activeTab === 'users' && (
-            <div className="bg-card border rounded-lg overflow-hidden">
+            <div className="space-y-4">
+              {/* User Statistics */}
+              <div className="bg-card border rounded-lg p-4">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold">{users.length}</p>
+                      <p className="text-xs text-muted-foreground">Total</p>
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:block w-px h-10 bg-border" />
+
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-purple-500" />
+                      <span className="text-sm font-medium">{users.filter(u => u.role === 'admin').length}</span>
+                      <span className="text-xs text-muted-foreground">admin</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                      <span className="text-sm font-medium">{users.filter(u => u.role === 'coordinator').length}</span>
+                      <span className="text-xs text-muted-foreground">coord</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="text-sm font-medium">{users.filter(u => u.role === 'editor').length}</span>
+                      <span className="text-xs text-muted-foreground">editor</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium">{users.filter(u => u.role === 'viewer').length}</span>
+                      <span className="text-xs text-muted-foreground">viewer</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-gray-400" />
+                      <span className="text-sm font-medium">{users.filter(u => u.role === 'pending').length}</span>
+                      <span className="text-xs text-muted-foreground">pending</span>
+                    </div>
+                  </div>
+
+                  <div className="hidden lg:block w-px h-10 bg-border" />
+
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                      <span className="font-medium">{users.filter(u => u.confirmed).length}</span>
+                      <span className="text-muted-foreground">verified</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <XCircle className="h-3.5 w-3.5 text-yellow-500" />
+                      <span className="font-medium">{users.filter(u => !u.confirmed).length}</span>
+                      <span className="text-muted-foreground">pending</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by email or name..."
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-8 py-2 border rounded-md bg-background text-sm"
+                  />
+                  {userSearchQuery && (
+                    <button
+                      onClick={() => setUserSearchQuery('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
+                >
+                  <option value="all">All Roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="coordinator">Coordinator</option>
+                  <option value="editor">Editor</option>
+                  <option value="viewer">Viewer</option>
+                  <option value="pending">Pending</option>
+                </select>
+                <select
+                  value={userStatusFilter}
+                  onChange={(e) => setUserStatusFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="verified">Verified</option>
+                  <option value="unverified">Unverified</option>
+                </select>
+                {(userSearchQuery || userRoleFilter !== 'all' || userStatusFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setUserSearchQuery('')
+                      setUserRoleFilter('all')
+                      setUserStatusFilter('all')
+                    }}
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+
+              {/* Users Table */}
+              <div className="bg-card border rounded-lg overflow-hidden">
+                <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {filteredUsers.length} of {users.length} users
+                  </span>
+                </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted/50">
@@ -1124,7 +1277,7 @@ export default function AdminPanel() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {users.map((user) => (
+                    {filteredUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-4 py-3 font-medium">
                           {user.first_name && user.last_name
@@ -1225,8 +1378,16 @@ export default function AdminPanel() {
                         )}
                       </tr>
                     ))}
+                    {filteredUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={canManageUsers ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">
+                          No users match your filters
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
+              </div>
               </div>
             </div>
           )}
