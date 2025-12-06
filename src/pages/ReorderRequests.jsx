@@ -16,12 +16,12 @@ const STATUS_CONFIG = {
 
 const PRIORITY_CONFIG = {
   high: { label: 'High', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200', order: 1 },
-  standard: { label: 'Standard', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200', order: 2 },
+  standard: { label: 'Standard', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200', order: 2 },
 }
 
 const ROLE_CONFIG = {
-  admin: { label: 'Pro Staff', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' },
-  coordinator: { label: 'Lead', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' },
+  admin: { label: 'Pro Staff', bgColor: 'bg-red-100 dark:bg-red-900/30', textColor: 'text-red-800 dark:text-red-200' },
+  coordinator: { label: 'Lead', bgColor: 'bg-yellow-100 dark:bg-yellow-900/30', textColor: 'text-yellow-800 dark:text-yellow-200' },
 }
 
 // Get relevant date based on status
@@ -114,13 +114,13 @@ const MobileRequestCard = memo(({ request, onClick }) => {
         </div>
         <div className="col-span-2">
           <span className="text-muted-foreground">Requestor:</span>
-          <div className="font-medium mt-0.5 flex items-center gap-2">
-            {request.requested_by_name || request.requested_by_user?.email || 'Unknown'}
-            {roleConfig && (
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${roleConfig.color}`}>
-                {roleConfig.label}
-              </span>
-            )}
+          <div className="font-medium mt-0.5">
+            <span
+              className={`${roleConfig ? `px-1.5 py-0.5 rounded ${roleConfig.bgColor} ${roleConfig.textColor}` : ''}`}
+              title={roleConfig ? roleConfig.label : undefined}
+            >
+              {request.requested_by_name || request.requested_by_user?.email || 'Unknown'}
+            </span>
           </div>
         </div>
         {request.purchased_on && (
@@ -170,7 +170,7 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
 
   return (
     <tr
-      className="hover:bg-muted/30 transition-colors cursor-pointer"
+      className="hover:bg-muted/30 transition-colors cursor-pointer h-14"
       onClick={onClick}
     >
       <td className="px-4 py-3">
@@ -222,14 +222,12 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
       </td>
       <td className="px-4 py-3 text-sm">{request.location?.name || 'Unknown'}</td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm">{request.requested_by_name || request.requested_by_user?.email || 'Unknown'}</span>
-          {roleConfig && (
-            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${roleConfig.color}`}>
-              {roleConfig.label}
-            </span>
-          )}
-        </div>
+        <span
+          className={`text-sm ${roleConfig ? `px-1.5 py-0.5 rounded ${roleConfig.bgColor} ${roleConfig.textColor}` : ''}`}
+          title={roleConfig ? roleConfig.label : undefined}
+        >
+          {request.requested_by_name || request.requested_by_user?.email || 'Unknown'}
+        </span>
       </td>
       <td className="px-4 py-3">
         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
@@ -241,9 +239,6 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
           <span className="text-muted-foreground">{relevantDate.label}:</span>
           <div>{formatDate(relevantDate.date)}</div>
         </div>
-      </td>
-      <td className="px-4 py-3 text-sm">
-        {request.purchased_on ? formatDate(request.purchased_on) : <span className="text-muted-foreground">—</span>}
       </td>
       <td className="px-4 py-3 text-sm">
         {request.purchased_by_name ||
@@ -652,7 +647,6 @@ export default function ReorderRequests() {
                   <th className="px-4 py-3 text-left text-sm font-medium">Requestor</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Purchased On</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Purchased By</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Notes</th>
                 </tr>
