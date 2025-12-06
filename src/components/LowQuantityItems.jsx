@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { AlertTriangle, Package } from 'lucide-react'
+import { AlertTriangle, Package, RefreshCw } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import ReorderRequestModal from './ReorderRequestModal'
 
 export default function LowQuantityItems() {
   const [lowQuantityItems, setLowQuantityItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showReorderModal, setShowReorderModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState(null)
+  const { isAdmin, isCoordinator } = useAuth()
 
   useEffect(() => {
     fetchLowQuantityItems()
@@ -105,6 +110,19 @@ export default function LowQuantityItems() {
                     <span>{item.min_quantity}</span>
                   </p>
                 </div>
+                {(isAdmin || isCoordinator) && (
+                  <button
+                    onClick={() => {
+                      setSelectedItem(item)
+                      setShowReorderModal(true)
+                    }}
+                    className="flex items-center gap-1.5 bg-indigo-500 text-white px-3 py-1.5 rounded-md hover:bg-indigo-600 transition-colors text-xs font-medium"
+                    title="Request Restock"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Request Restock</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -114,6 +132,19 @@ export default function LowQuantityItems() {
           <p className="text-sm text-muted-foreground">All items are at or above their minimum quantity levels</p>
         </div>
       )}
+
+      <ReorderRequestModal
+        isOpen={showReorderModal}
+        onClose={() => {
+          setShowReorderModal(false)
+          setSelectedItem(null)
+        }}
+        onSuccess={() => {
+          setShowReorderModal(false)
+          setSelectedItem(null)
+        }}
+        preselectedItem={selectedItem}
+      />
     </div>
   )
 }

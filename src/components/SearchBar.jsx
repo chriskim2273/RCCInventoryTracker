@@ -1,4 +1,4 @@
-import { useState, memo } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { Search, Sparkles, Download, X } from 'lucide-react'
 
 const SearchBar = memo(({
@@ -11,8 +11,13 @@ const SearchBar = memo(({
   activeSearchQuery,
   aiSearchError
 }) => {
-  const [localInput, setLocalInput] = useState('')
+  const [localInput, setLocalInput] = useState(activeSearchQuery || '')
   const [isAiHovered, setIsAiHovered] = useState(false)
+
+  // Sync localInput when activeSearchQuery changes (e.g., on back navigation)
+  useEffect(() => {
+    setLocalInput(activeSearchQuery || '')
+  }, [activeSearchQuery])
 
   const handleRegularSearch = () => {
     onRegularSearch(localInput)
