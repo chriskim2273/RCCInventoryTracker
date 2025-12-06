@@ -19,6 +19,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
     category_id: '',
     location_id: locationId || '',
     description: '',
+    order_link: '',
   })
   const [unknownQuantity, setUnknownQuantity] = useState(false)
   const [imageFile, setImageFile] = useState(null)
@@ -48,6 +49,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           category_id: item.category_id || '',
           location_id: item.location_id || '',
           description: item.description || '',
+          order_link: item.order_link || '',
         })
         setUnknownQuantity(isQuantityUnknown)
         setImagePreview(item.image_url || null)
@@ -64,6 +66,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
           category_id: '',
           location_id: locationId || '',
           description: '',
+          order_link: '',
         })
         setUnknownQuantity(false)
         setImagePreview(null)
@@ -211,6 +214,7 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         image_url: imageUrl,
         quantity: unknownQuantity ? null : parseInt(formData.quantity),
         min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
+        order_link: formData.order_link || null,
       }
 
       // Check if we're editing an item and the location has changed
@@ -447,6 +451,20 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-3 py-2 border rounded-md bg-background"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Order Link</label>
+            <input
+              type="url"
+              placeholder="https://..."
+              value={formData.order_link}
+              onChange={(e) => setFormData({ ...formData, order_link: e.target.value })}
+              className="w-full px-3 py-2 border rounded-md bg-background"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              URL for ordering this item (optional)
+            </p>
           </div>
 
           <div>
