@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, memo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Package, CheckCircle, Trash2, MapPin, X } from 'lucide-react'
+import { Package, CheckCircle, Trash2, MapPin, X, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
 import { fuzzySearchItems } from '@/lib/fuzzySearch'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import ItemModal from '@/components/ItemModal'
 import SearchBar from '@/components/SearchBar'
 import { aiSearch } from '@/lib/aiSearch'
 
@@ -183,10 +184,6 @@ export default function Items() {
   const [filteredItems, setFilteredItems] = useState([])
   const [categories, setCategories] = useState([])
   const [locations, setLocations] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState(null)
-  const [selectedStatus, setSelectedStatus] = useState('all')
-  const [selectedLocation, setSelectedLocation] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const [selectedItems, setSelectedItems] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [sublocationIds, setSublocationIds] = useState([])
@@ -194,32 +191,39 @@ export default function Items() {
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [moveToLocationId, setMoveToLocationId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [useAiSearch, setUseAiSearch] = useState(false)
   const [searchLoading, setSearchLoading] = useState(false)
   const [aiMatchingIds, setAiMatchingIds] = useState([])
   const [aiSearchError, setAiSearchError] = useState(null)
+  const [showItemModal, setShowItemModal] = useState(false)
   const { canEdit, user } = useAuth()
+
+  // Derive filter state directly from URL params (single source of truth)
+  const searchQuery = searchParams.get('search') || ''
+  const useAiSearch = searchParams.get('ai') === '1'
+  const selectedCategory = searchParams.get('category') || null
+  const selectedStatus = searchParams.get('status') || 'all'
+  const selectedLocation = searchParams.get('location') || null
+
+  // Helper to update URL params
+  const updateParams = useCallback((updates) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev)
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '' || value === 'all') {
+          newParams.delete(key)
+        } else {
+          newParams.set(key, String(value))
+        }
+      })
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  // Read category from URL params on mount and when params change
-  useEffect(() => {
-    const categoryParam = searchParams.get('category')
-    if (categoryParam) {
-      setSelectedCategory(categoryParam)
-    }
-  }, [searchParams])
-
-  // Read location from URL params on mount and when params change
-  useEffect(() => {
-    const locationParam = searchParams.get('location')
-    if (locationParam) {
-      setSelectedLocation(locationParam)
-    }
-  }, [searchParams])
-
+  // Filter items when dependencies change
   useEffect(() => {
     filterItems()
   }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds, useAiSearch, aiMatchingIds])
@@ -257,6 +261,26 @@ export default function Items() {
 
     performAiSearch()
   }, [useAiSearch, searchQuery, items])
+
+  // Scroll persistence - save scroll position when navigating away
+  useEffect(() => {
+    return () => {
+      sessionStorage.setItem('items-scroll', String(window.scrollY))
+    }
+  }, [])
+
+  // Scroll persistence - restore scroll position after content loads
+  useEffect(() => {
+    if (!loading && filteredItems.length > 0) {
+      const savedScroll = sessionStorage.getItem('items-scroll')
+      if (savedScroll) {
+        requestAnimationFrame(() => {
+          window.scrollTo(0, parseInt(savedScroll, 10))
+        })
+        sessionStorage.removeItem('items-scroll')
+      }
+    }
+  }, [loading, filteredItems.length])
 
   // Recursively get all sublocation IDs for a given location
   const getAllSublocationIds = async (locationId) => {
@@ -383,27 +407,24 @@ export default function Items() {
 
   const handleRegularSearch = useCallback((inputValue) => {
     setSearchLoading(true)
-    setUseAiSearch(false)
-    setSearchQuery(inputValue)
     setAiSearchError(null)
     setAiMatchingIds([])
+    updateParams({ search: inputValue, ai: null })
     // Simulate brief loading for UI consistency
     setTimeout(() => {
       setSearchLoading(false)
     }, 100)
-  }, [])
+  }, [updateParams])
 
   const handleAiSearch = useCallback((inputValue) => {
-    setUseAiSearch(true)
-    setSearchQuery(inputValue)
-  }, [])
+    updateParams({ search: inputValue, ai: '1' })
+  }, [updateParams])
 
   const handleClearSearch = useCallback(() => {
-    setSearchQuery('')
-    setUseAiSearch(false)
     setAiMatchingIds([])
     setAiSearchError(null)
-  }, [])
+    updateParams({ search: null, ai: null })
+  }, [updateParams])
 
   const toggleSelectItem = useCallback((itemId) => {
     setSelectedItems((prev) => {
@@ -527,7 +548,7 @@ export default function Items() {
             <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Category</label>
             <select
               value={selectedCategory || ''}
-              onChange={(e) => setSelectedCategory(e.target.value || null)}
+              onChange={(e) => updateParams({ category: e.target.value || null })}
               className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="">All Categories</option>
@@ -543,7 +564,7 @@ export default function Items() {
             <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Status</label>
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => updateParams({ status: e.target.value })}
               className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="all">All Statuses</option>
@@ -556,7 +577,7 @@ export default function Items() {
             <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Location</label>
             <select
               value={selectedLocation || ''}
-              onChange={(e) => setSelectedLocation(e.target.value || null)}
+              onChange={(e) => updateParams({ location: e.target.value || null })}
               className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="">All Locations</option>
@@ -575,6 +596,15 @@ export default function Items() {
           <h2 className="text-lg sm:text-xl font-semibold">
             Items ({filteredItems.length})
           </h2>
+          {canEdit && (
+            <button
+              onClick={() => setShowItemModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Add Item
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -687,6 +717,16 @@ export default function Items() {
         userEmail={user?.email || ''}
         affectedData={{
           items: items.filter(item => selectedItems.has(item.id))
+        }}
+      />
+
+      {/* Item Create Modal */}
+      <ItemModal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        onSuccess={() => {
+          setShowItemModal(false)
+          fetchData()
         }}
       />
 

@@ -10,6 +10,8 @@ import Items from '@/pages/Items'
 import LocationExplorer from '@/pages/LocationExplorer'
 import ItemDetail from '@/pages/ItemDetail'
 import AdminPanel from '@/pages/AdminPanel'
+import ReorderRequests from '@/pages/ReorderRequests'
+import Credits from '@/pages/Credits'
 
 function App() {
   return (
@@ -41,6 +43,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="reorder-requests"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                  <ReorderRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="credits" element={<Credits />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

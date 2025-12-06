@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Package, MapPin, Users } from 'lucide-react'
+import { Package, MapPin, Users, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import TreeView from '@/components/TreeView'
 import LowQuantityItems from '@/components/LowQuantityItems'
@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [items, setItems] = useState([])
   const [locations, setLocations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showLocationHierarchy, setShowLocationHierarchy] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -126,16 +127,26 @@ export default function Dashboard() {
       </div>
 
       <div className="bg-card border rounded-lg p-4 sm:p-6">
-        <div className="flex items-center gap-2 mb-4">
+        <button
+          onClick={() => setShowLocationHierarchy(!showLocationHierarchy)}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          {showLocationHierarchy ? (
+            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+          )}
           <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
           <h2 className="text-lg sm:text-xl font-semibold">Location Hierarchy</h2>
-        </div>
-        <div className="max-h-64 sm:max-h-96 overflow-y-auto">
-          <TreeView
-            locations={locations}
-            onLocationClick={(location) => setSelectedLocation(location.id)}
-          />
-        </div>
+        </button>
+        {showLocationHierarchy && (
+          <div className="max-h-64 sm:max-h-96 overflow-y-auto mt-4">
+            <TreeView
+              locations={locations}
+              onLocationClick={(location) => setSelectedLocation(location.id)}
+            />
+          </div>
+        )}
       </div>
 
       <div className="bg-card border rounded-lg p-4 sm:p-6">

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { ArrowLeft, Edit, Trash2, Plus, Minus, UserCheck, UserX, ChevronDown, ChevronRight, History } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Plus, Minus, UserCheck, UserX, ChevronDown, ChevronRight, History, RefreshCw } from 'lucide-react'
 import ItemModal from '@/components/ItemModal'
+import ReorderRequestModal from '@/components/ReorderRequestModal'
 import CheckoutModal from '@/components/CheckoutModal'
 import CheckinModal from '@/components/CheckinModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
@@ -12,7 +13,7 @@ import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/li
 export default function ItemDetail() {
   const { itemId } = useParams()
   const navigate = useNavigate()
-  const { canEdit, user } = useAuth()
+  const { canEdit, user, isAdmin, isCoordinator } = useAuth()
   const [item, setItem] = useState(null)
   const [logs, setLogs] = useState([])
   const [checkoutLogs, setCheckoutLogs] = useState([])
@@ -27,6 +28,7 @@ export default function ItemDetail() {
   const [showChangeLogs, setShowChangeLogs] = useState(false)
   const [showCheckoutLogs, setShowCheckoutLogs] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showReorderModal, setShowReorderModal] = useState(false)
   const [expandedLogIds, setExpandedLogIds] = useState(new Set())
 
   const getUserDisplayName = (user) => {
@@ -843,6 +845,17 @@ export default function ItemDetail() {
                       </button>
                     )}
                   </div>
+
+                  {/* Request Restock Button - Admin/Coordinator only */}
+                  {(isAdmin || isCoordinator) && (
+                    <button
+                      onClick={() => setShowReorderModal(true)}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-md hover:bg-indigo-600 transition-colors mt-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Request Restock
+                    </button>
+                  )}
                 </div>
               )
             })()}
@@ -880,6 +893,13 @@ export default function ItemDetail() {
         itemType="item"
         userEmail={user?.email || ''}
         affectedData={null}
+      />
+
+      <ReorderRequestModal
+        isOpen={showReorderModal}
+        onClose={() => setShowReorderModal(false)}
+        onSuccess={() => setShowReorderModal(false)}
+        preselectedItem={item}
       />
     </div >
   )

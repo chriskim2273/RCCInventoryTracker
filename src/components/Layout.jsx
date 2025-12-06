@@ -8,7 +8,9 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  ShoppingCart,
+  Heart
 } from 'lucide-react'
 import sbuLogo from '@/assets/white-star.svg'
 
@@ -30,7 +32,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
@@ -74,6 +76,16 @@ export default function Layout() {
 
               {(isAdmin || isCoordinator) && (
                 <Link
+                  to="/reorder-requests"
+                  className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Reorders
+                </Link>
+              )}
+
+              {(isAdmin || isCoordinator) && (
+                <Link
                   to="/admin"
                   className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
                 >
@@ -81,6 +93,14 @@ export default function Layout() {
                   Admin
                 </Link>
               )}
+
+              <Link
+                to="/credits"
+                className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
+              >
+                <Heart className="h-4 w-4" />
+                Credits
+              </Link>
 
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-primary-foreground/30">
                 <div className="text-sm">
@@ -140,6 +160,17 @@ export default function Layout() {
 
               {(isAdmin || isCoordinator) && (
                 <Link
+                  to="/reorder-requests"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  Reorder Requests
+                </Link>
+              )}
+
+              {(isAdmin || isCoordinator) && (
+                <Link
                   to="/admin"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
@@ -148,6 +179,15 @@ export default function Layout() {
                   Admin
                 </Link>
               )}
+
+              <Link
+                to="/credits"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+              >
+                <Heart className="h-5 w-5" />
+                Credits
+              </Link>
 
               <div className="pt-4 mt-4 border-t border-primary-foreground/30 space-y-3">
                 <div className="text-sm">
@@ -171,9 +211,23 @@ export default function Layout() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-4 sm:py-8">
+      <main className="container mx-auto px-4 py-4 sm:py-8 flex-1">
         <Outlet />
       </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-muted/30 py-4">
+        <div className="container mx-auto px-4 flex items-center justify-center">
+          <Link
+            to="/credits"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group"
+          >
+            <span>Made with</span>
+            <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500 group-hover:scale-110 transition-transform" />
+            <span>by RCC students</span>
+          </Link>
+        </div>
+      </footer>
     </div>
   )
 }

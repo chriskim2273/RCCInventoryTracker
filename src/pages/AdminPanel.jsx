@@ -55,6 +55,14 @@ export default function AdminPanel() {
   const [savingPreferences, setSavingPreferences] = useState(false)
   const { user: currentUser, canManageUsers } = useAuth()
 
+  // Protected users that cannot be deleted
+  const PROTECTED_EMAILS = [
+    'sheen.alfred@stonybrook.edu',
+    'christopherkim2273@gmail.com'
+  ]
+
+  const isProtectedUser = (email) => PROTECTED_EMAILS.includes(email?.toLowerCase())
+
   // Filter states
   const [auditSearchQuery, setAuditSearchQuery] = useState('')
   const [auditActionFilter, setAuditActionFilter] = useState('all')
@@ -588,6 +596,12 @@ export default function AdminPanel() {
 
   // Admin API handlers
   const handleDeleteUser = async (userId, userEmail) => {
+    // Check if user is protected
+    if (isProtectedUser(userEmail)) {
+      alert('This user cannot be deleted.')
+      return
+    }
+
     if (!confirm(`Are you sure you want to delete user ${userEmail}? This action cannot be undone.`)) {
       return
     }
@@ -1364,7 +1378,7 @@ export default function AdminPanel() {
                               >
                                 <Key className="h-4 w-4" />
                               </button>
-                              {user.id !== currentUser.id && (
+                              {user.id !== currentUser.id && !isProtectedUser(user.email) && (
                                 <button
                                   onClick={() => handleDeleteUser(user.id, user.email)}
                                   className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
