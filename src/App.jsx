@@ -10,6 +10,7 @@ import Items from '@/pages/Items'
 import LocationExplorer from '@/pages/LocationExplorer'
 import ItemDetail from '@/pages/ItemDetail'
 import AdminPanel from '@/pages/AdminPanel'
+import ReorderRequests from '@/pages/ReorderRequests'
 
 function App() {
   return (
@@ -38,6 +39,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
                   <AdminPanel />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="reorder-requests"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                  <ReorderRequests />
                 </ProtectedRoute>
               }
             />

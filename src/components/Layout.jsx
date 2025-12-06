@@ -8,7 +8,8 @@ import {
   Settings,
   LogOut,
   Menu,
-  X
+  X,
+  ShoppingCart
 } from 'lucide-react'
 import sbuLogo from '@/assets/white-star.svg'
 
@@ -82,6 +83,16 @@ export default function Layout() {
                 </Link>
               )}
 
+              {(isAdmin || isCoordinator) && (
+                <Link
+                  to="/reorder-requests"
+                  className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Reorders
+                </Link>
+              )}
+
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-primary-foreground/30">
                 <div className="text-sm">
                   <div className="font-medium">{getUserDisplayName()}</div>
@@ -146,6 +157,17 @@ export default function Layout() {
                 >
                   <Settings className="h-5 w-5" />
                   Admin
+                </Link>
+              )}
+
+              {(isAdmin || isCoordinator) && (
+                <Link
+                  to="/reorder-requests"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  Reorder Requests
                 </Link>
               )}
 
