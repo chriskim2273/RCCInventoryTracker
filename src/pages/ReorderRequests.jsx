@@ -1,22 +1,22 @@
 import { useState, useEffect, memo, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { Plus, Search, ExternalLink, Package } from 'lucide-react'
+import { Plus, Search, ExternalLink, Package, ChevronUp, ChevronDown } from 'lucide-react'
 import ReorderRequestModal from '@/components/ReorderRequestModal'
 import Fuse from 'fuse.js'
 
 const STATUS_CONFIG = {
-  new_request: { label: 'New Request', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200' },
-  approved_pending: { label: 'Approved / Pending', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200' },
-  purchased: { label: 'Purchased', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200' },
-  arrived: { label: 'Arrived', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200' },
-  documented: { label: 'Documented', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' },
+  new_request: { label: 'New Request', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200', order: 1 },
+  approved_pending: { label: 'Approved / Pending', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200', order: 2 },
+  purchased: { label: 'Purchased', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200', order: 3 },
+  arrived: { label: 'Arrived', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200', order: 4 },
+  documented: { label: 'Documented', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200', order: 5 },
+  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200', order: 6 },
 }
 
 const PRIORITY_CONFIG = {
-  high: { label: 'High', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' },
-  standard: { label: 'Standard', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200' },
+  high: { label: 'High', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200', order: 1 },
+  standard: { label: 'Standard', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-200', order: 2 },
 }
 
 const ROLE_CONFIG = {
@@ -123,6 +123,23 @@ const MobileRequestCard = memo(({ request, onClick }) => {
             )}
           </div>
         </div>
+        {request.purchased_on && (
+          <div>
+            <span className="text-muted-foreground">Purchased:</span>
+            <div className="font-medium mt-0.5">{formatDate(request.purchased_on)}</div>
+          </div>
+        )}
+        {(request.purchased_by_name || request.purchased_by_user) && (
+          <div>
+            <span className="text-muted-foreground">Purchased By:</span>
+            <div className="font-medium mt-0.5">
+              {request.purchased_by_name ||
+               (request.purchased_by_user?.first_name && request.purchased_by_user?.last_name
+                 ? `${request.purchased_by_user.first_name} ${request.purchased_by_user.last_name}`
+                 : request.purchased_by_user?.email) || 'Unknown'}
+            </div>
+          </div>
+        )}
       </div>
 
       {request.order_link && (
@@ -225,6 +242,15 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
           <div>{formatDate(relevantDate.date)}</div>
         </div>
       </td>
+      <td className="px-4 py-3 text-sm">
+        {request.purchased_on ? formatDate(request.purchased_on) : <span className="text-muted-foreground">—</span>}
+      </td>
+      <td className="px-4 py-3 text-sm">
+        {request.purchased_by_name ||
+         (request.purchased_by_user?.first_name && request.purchased_by_user?.last_name
+           ? `${request.purchased_by_user.first_name} ${request.purchased_by_user.last_name}`
+           : request.purchased_by_user?.email) || <span className="text-muted-foreground">—</span>}
+      </td>
       <td className="px-4 py-3 text-sm max-w-[200px]">
         {request.notes ? (
           <span className="truncate block" title={request.notes}>{request.notes}</span>
@@ -247,8 +273,20 @@ export default function ReorderRequests() {
   const [showModal, setShowModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState(null)
 
+  // Filter state
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [selectedPriority, setSelectedPriority] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState('')
+  const [categories, setCategories] = useState([])
+  const [locations, setLocations] = useState([])
+
+  // Sort state
+  const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
+
   useEffect(() => {
     fetchRequests()
+    fetchFilterData()
   }, [])
 
   const fetchRequests = async () => {
@@ -276,6 +314,20 @@ export default function ReorderRequests() {
     }
   }
 
+  const fetchFilterData = async () => {
+    try {
+      const [categoriesResult, locationsResult] = await Promise.all([
+        supabase.from('categories').select('*').is('deleted_at', null).order('name'),
+        supabase.from('locations').select('*').is('deleted_at', null).order('path'),
+      ])
+
+      if (categoriesResult.data) setCategories(categoriesResult.data)
+      if (locationsResult.data) setLocations(locationsResult.data)
+    } catch (err) {
+      console.error('Error fetching filter data:', err)
+    }
+  }
+
   // Fuse.js configuration for fuzzy search
   const fuse = useMemo(() => {
     return new Fuse(requests, {
@@ -300,11 +352,35 @@ export default function ReorderRequests() {
     })
   }, [requests])
 
-  // Filter requests based on search query
+  // Sort function
+  const sortRequests = (requestsToSort) => {
+    return [...requestsToSort].sort((a, b) => {
+      // Primary sort: status
+      const statusOrderA = STATUS_CONFIG[a.status]?.order || 99
+      const statusOrderB = STATUS_CONFIG[b.status]?.order || 99
+
+      if (statusOrderA !== statusOrderB) {
+        return sortDirection === 'asc'
+          ? statusOrderA - statusOrderB
+          : statusOrderB - statusOrderA
+      }
+
+      // Secondary sort: priority (high first)
+      const priorityOrderA = PRIORITY_CONFIG[a.priority]?.order || 99
+      const priorityOrderB = PRIORITY_CONFIG[b.priority]?.order || 99
+
+      return sortDirection === 'asc'
+        ? priorityOrderA - priorityOrderB
+        : priorityOrderB - priorityOrderA
+    })
+  }
+
+  // Filter and sort requests
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredRequests(requests)
-    } else {
+    let filtered = [...requests]
+
+    // Filter by search query
+    if (searchQuery.trim()) {
       // Also check for status label matches
       const statusMatch = Object.entries(STATUS_CONFIG).find(
         ([key, config]) => config.label.toLowerCase().includes(searchQuery.toLowerCase())
@@ -315,14 +391,51 @@ export default function ReorderRequests() {
         const statusFiltered = requests.filter(r => r.status === statusKey)
         const fuseResults = fuse.search(searchQuery).map(r => r.item)
         // Combine and dedupe
-        const combined = [...new Map([...statusFiltered, ...fuseResults].map(r => [r.id, r])).values()]
-        setFilteredRequests(combined)
+        filtered = [...new Map([...statusFiltered, ...fuseResults].map(r => [r.id, r])).values()]
       } else {
         const results = fuse.search(searchQuery)
-        setFilteredRequests(results.map(r => r.item))
+        filtered = results.map(r => r.item)
       }
     }
-  }, [searchQuery, requests, fuse])
+
+    // Filter by status
+    if (selectedStatus) {
+      filtered = filtered.filter(r => r.status === selectedStatus)
+    }
+
+    // Filter by priority
+    if (selectedPriority) {
+      filtered = filtered.filter(r => r.priority === selectedPriority)
+    }
+
+    // Filter by category
+    if (selectedCategory) {
+      filtered = filtered.filter(r => r.category_id === selectedCategory)
+    }
+
+    // Filter by location
+    if (selectedLocation) {
+      filtered = filtered.filter(r => r.location_id === selectedLocation)
+    }
+
+    // Apply sorting
+    const sorted = sortRequests(filtered)
+    setFilteredRequests(sorted)
+  }, [searchQuery, requests, fuse, selectedStatus, selectedPriority, selectedCategory, selectedLocation, sortDirection])
+
+  const toggleSortDirection = () => {
+    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+
+  const clearAllFilters = () => {
+    setSearchQuery('')
+    setSelectedStatus('')
+    setSelectedPriority('')
+    setSelectedCategory('')
+    setSelectedLocation('')
+  }
+
+  const hasActiveFilters = searchQuery || selectedStatus || selectedPriority || selectedCategory || selectedLocation
 
   const handleRowClick = (request) => {
     setSelectedRequest(request)
@@ -364,7 +477,7 @@ export default function ReorderRequests() {
           <h1 className="text-xl sm:text-2xl font-bold">Reorder Requests</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''}
-            {searchQuery && ` matching "${searchQuery}"`}
+            {hasActiveFilters && ' (filtered)'}
           </p>
         </div>
         <button
@@ -376,16 +489,111 @@ export default function ReorderRequests() {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Search by item, requestor, category, status, or notes..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border rounded-md bg-background"
-        />
+      {/* Search and Filters */}
+      <div className="space-y-3 sm:space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by item, requestor, category, status, or notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border rounded-md bg-background"
+          />
+        </div>
+
+        {/* Filter Dropdowns */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div>
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Status</label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
+            >
+              <option value="">All Statuses</option>
+              {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                <option key={key} value={key}>{config.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Priority</label>
+            <select
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value)}
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
+            >
+              <option value="">All Priorities</option>
+              {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+                <option key={key} value={key}>{config.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Category</label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
+            >
+              <option value="">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.icon} {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Location</label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
+            >
+              <option value="">All Locations</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.path}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Sort Toggle and Clear Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={toggleSortDirection}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted transition-colors"
+          >
+            {sortDirection === 'asc' ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                Status: New → Documented
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                Status: Documented → New
+              </>
+            )}
+          </button>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearAllFilters}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear all filters
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Results */}
@@ -394,17 +602,25 @@ export default function ReorderRequests() {
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No Requests Found</h3>
           <p className="text-muted-foreground mb-4">
-            {searchQuery
-              ? 'Try adjusting your search terms'
+            {hasActiveFilters
+              ? 'Try adjusting your filters or search terms'
               : 'Create your first reorder request to get started'}
           </p>
-          {!searchQuery && (
+          {!hasActiveFilters && (
             <button
               onClick={handleNewRequest}
               className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
             >
               <Plus className="h-4 w-4" />
               New Request
+            </button>
+          )}
+          {hasActiveFilters && (
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-secondary transition-colors"
+            >
+              Clear Filters
             </button>
           )}
         </div>
@@ -422,7 +638,7 @@ export default function ReorderRequests() {
           </div>
 
           {/* Desktop View */}
-          <div className="hidden lg:block overflow-x-auto">
+          <div className="hidden lg:block bg-card border rounded-lg overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted/50">
                 <tr>
@@ -436,6 +652,8 @@ export default function ReorderRequests() {
                   <th className="px-4 py-3 text-left text-sm font-medium">Requestor</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Purchased On</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium">Purchased By</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Notes</th>
                 </tr>
               </thead>

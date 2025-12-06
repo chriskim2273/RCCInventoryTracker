@@ -850,7 +850,7 @@ export default function ItemDetail() {
                   {(isAdmin || isCoordinator) && (
                     <button
                       onClick={() => setShowReorderModal(true)}
-                      className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-md hover:bg-orange-600 transition-colors mt-2"
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-md hover:bg-indigo-600 transition-colors mt-2"
                     >
                       <RefreshCw className="h-4 w-4" />
                       Request Restock

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
 import RelocationConfirmationModal from './RelocationConfirmationModal'
+import LocationPicker from './LocationPicker'
 import { Upload, X, AlertTriangle } from 'lucide-react'
 import imageCompression from 'browser-image-compression'
 
@@ -427,19 +428,13 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
 
             <div>
               <label className="block text-sm font-medium mb-1">Location *</label>
-              <select
-                required
+              <LocationPicker
+                locations={locations}
                 value={formData.location_id}
-                onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-              >
-                <option value="">Select location...</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.path}
-                  </option>
-                ))}
-              </select>
+                onChange={(locationId) => setFormData({ ...formData, location_id: locationId })}
+                required
+                placeholder="Select location..."
+              />
             </div>
           </div>
 

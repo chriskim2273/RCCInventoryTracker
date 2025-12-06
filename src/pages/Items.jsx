@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, memo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Package, CheckCircle, Trash2, MapPin, X } from 'lucide-react'
+import { Package, CheckCircle, Trash2, MapPin, X, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
 import { fuzzySearchItems } from '@/lib/fuzzySearch'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
+import ItemModal from '@/components/ItemModal'
 import SearchBar from '@/components/SearchBar'
 import { aiSearch } from '@/lib/aiSearch'
 
@@ -198,6 +199,7 @@ export default function Items() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [aiMatchingIds, setAiMatchingIds] = useState([])
   const [aiSearchError, setAiSearchError] = useState(null)
+  const [showItemModal, setShowItemModal] = useState(false)
   const { canEdit, user } = useAuth()
 
   useEffect(() => {
@@ -575,6 +577,15 @@ export default function Items() {
           <h2 className="text-lg sm:text-xl font-semibold">
             Items ({filteredItems.length})
           </h2>
+          {canEdit && (
+            <button
+              onClick={() => setShowItemModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Add Item
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -687,6 +698,16 @@ export default function Items() {
         userEmail={user?.email || ''}
         affectedData={{
           items: items.filter(item => selectedItems.has(item.id))
+        }}
+      />
+
+      {/* Item Create Modal */}
+      <ItemModal
+        isOpen={showItemModal}
+        onClose={() => setShowItemModal(false)}
+        onSuccess={() => {
+          setShowItemModal(false)
+          fetchData()
         }}
       />
 
