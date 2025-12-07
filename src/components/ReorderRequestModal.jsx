@@ -48,6 +48,13 @@ const formatDateTime = (dateStr) => {
   })
 }
 
+// Get local datetime string for datetime-local input (not UTC)
+const getLocalDateTimeString = (date = new Date()) => {
+  const offset = date.getTimezoneOffset()
+  const localDate = new Date(date.getTime() - offset * 60 * 1000)
+  return localDate.toISOString().slice(0, 16)
+}
+
 
 export default function ReorderRequestModal({
   isOpen,
@@ -69,7 +76,7 @@ export default function ReorderRequestModal({
     item_brand: '',
     item_model: '',
     item_category_id: '',
-    date_requested: new Date().toISOString().slice(0, 16),
+    date_requested: getLocalDateTimeString(),
     priority: 'standard',
     quantity_to_order: 1,
     units_per_pack: '',
@@ -109,7 +116,7 @@ export default function ReorderRequestModal({
           item_brand: request.item_brand || '',
           item_model: request.item_model || '',
           item_category_id: request.item_category_id || '',
-          date_requested: request.date_requested ? new Date(request.date_requested).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+          date_requested: request.date_requested ? getLocalDateTimeString(new Date(request.date_requested)) : getLocalDateTimeString(),
           priority: request.priority || 'standard',
           quantity_to_order: request.quantity_to_order || 1,
           units_per_pack: request.units_per_pack || '',
@@ -138,7 +145,7 @@ export default function ReorderRequestModal({
           item_brand: preselectedItem.brand || '',
           item_model: preselectedItem.model || '',
           item_category_id: preselectedItem.category_id || '',
-          date_requested: new Date().toISOString().slice(0, 16),
+          date_requested: getLocalDateTimeString(),
           priority: 'standard',
           quantity_to_order: 1,
           units_per_pack: '',
@@ -160,7 +167,7 @@ export default function ReorderRequestModal({
           item_brand: '',
           item_model: '',
           item_category_id: '',
-          date_requested: new Date().toISOString().slice(0, 16),
+          date_requested: getLocalDateTimeString(),
           priority: 'standard',
           quantity_to_order: 1,
           units_per_pack: '',
@@ -382,7 +389,7 @@ export default function ReorderRequestModal({
         item_brand: request.item_brand || '',
         item_model: request.item_model || '',
         item_category_id: request.item_category_id || '',
-        date_requested: request.date_requested ? new Date(request.date_requested).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+        date_requested: request.date_requested ? getLocalDateTimeString(new Date(request.date_requested)) : getLocalDateTimeString(),
         priority: request.priority || 'standard',
         quantity_to_order: request.quantity_to_order || 1,
         units_per_pack: request.units_per_pack || '',
