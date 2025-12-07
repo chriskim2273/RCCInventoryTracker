@@ -210,7 +210,7 @@ export default function Layout() {
           >
             <span>Made with</span>
             <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500 group-hover:scale-110 transition-transform" />
-            <span>by RCC students</span>
+            <span>by RCC Event Assistants</span>
           </Link>
         </div>
       </footer>
