@@ -193,7 +193,7 @@ export default function ReorderRequestModal({
       supabase.from('items').select('id, name, brand, model, category_id, order_link, location_id').is('deleted_at', null).order('name'),
       supabase.from('categories').select('*').is('deleted_at', null).order('name'),
       supabase.from('locations').select('*').is('deleted_at', null).order('path'),
-      supabase.from('users').select('*').in('role', ['admin', 'coordinator']).order('first_name, last_name, email'),
+      supabase.from('users').select('*').eq('role', 'admin').order('first_name, last_name, email'),
     ])
     setItems(itemsRes.data || [])
     setCategories(categoriesRes.data || [])
