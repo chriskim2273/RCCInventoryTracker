@@ -126,4 +126,54 @@
   .duration-150 {
     animation-duration: 150ms;
   }
+
+  /* Item Picker animations */
+  @keyframes fadeInBackdrop {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUpScale {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes itemReveal {
+    from {
+      opacity: 0;
+      transform: translateX(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeInBackdrop 0.2s ease-out forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUpScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-item-reveal {
+    animation: itemReveal 0.2s ease-out forwards;
+  }
+
+  /* Smooth focus ring for item picker */
+  .item-picker-focus-ring:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary));
+  }
 }

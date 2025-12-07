@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
+import ItemPicker, { ItemPickerTrigger } from './ItemPicker'
 import { ExternalLink, Pencil, RefreshCw } from 'lucide-react'
 
 const STATUS_OPTIONS = [
@@ -82,6 +83,7 @@ export default function ReorderRequestModal({
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [showItemPicker, setShowItemPicker] = useState(false)
 
   // Separate state for status update form
   const [statusFormData, setStatusFormData] = useState({
@@ -229,6 +231,35 @@ export default function ReorderRequestModal({
         item_category_id: '',
       })
     }
+  }
+
+  // Handle item selection from the new ItemPicker
+  const handleItemPickerSelect = (selectedItem) => {
+    setFormData({
+      ...formData,
+      item_id: selectedItem.id,
+      item_name: selectedItem.name,
+      item_brand: selectedItem.brand || '',
+      item_model: selectedItem.model || '',
+      item_category_id: selectedItem.category_id || '',
+      order_link: selectedItem.order_link || formData.order_link,
+      location_id: findCenterForLocation(selectedItem.location_id) || formData.location_id,
+    })
+    setShowItemPicker(false)
+  }
+
+  // Get selected item object for the picker
+  const getSelectedItemForPicker = () => {
+    return items.find(i => i.id === formData.item_id) || null
+  }
+
+  // Get category for selected item
+  const getSelectedItemCategory = () => {
+    const item = getSelectedItemForPicker()
+    if (item) {
+      return categories.find(c => c.id === item.category_id) || null
+    }
+    return null
   }
 
   const handlePurchaserSelection = (userId) => {
@@ -769,86 +800,96 @@ export default function ReorderRequestModal({
             </div>
           )}
 
-          {/* Item Selection Toggle */}
-          <div className="bg-muted/50 p-4 rounded-lg space-y-4">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={!formData.is_new_item}
-                  onChange={() => setFormData({ ...formData, is_new_item: false, item_id: '', item_name: '', item_brand: '', item_model: '', item_category_id: '' })}
-                  className="rounded-full"
-                  disabled={isExistingRequest}
-                />
-                <span className="text-sm font-medium">Existing Item</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  checked={formData.is_new_item}
-                  onChange={() => setFormData({ ...formData, is_new_item: true, item_id: '' })}
-                  className="rounded-full"
-                  disabled={isExistingRequest}
-                />
-                <span className="text-sm font-medium">New Item (not in inventory)</span>
-              </label>
+          {/* Item Selection */}
+          <div className="space-y-4">
+            {/* Toggle between existing/new item */}
+            <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_new_item: false, item_id: '', item_name: '', item_brand: '', item_model: '', item_category_id: '' })}
+                disabled={isExistingRequest}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  !formData.is_new_item
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                } ${isExistingRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Existing Item
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, is_new_item: true, item_id: '' })}
+                disabled={isExistingRequest}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  formData.is_new_item
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                } ${isExistingRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                New Item
+              </button>
             </div>
 
             {!formData.is_new_item ? (
+              /* Command-palette style item picker */
               <div>
-                <label className="block text-sm font-medium mb-1">Select Item *</label>
-                <select
-                  required={!formData.is_new_item}
-                  value={formData.item_id}
-                  onChange={(e) => handleItemChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background"
+                <label className="block text-sm font-medium mb-2">Select Item *</label>
+                <ItemPickerTrigger
+                  selectedItem={getSelectedItemForPicker()}
+                  category={getSelectedItemCategory()}
+                  onClick={() => !isExistingRequest && setShowItemPicker(true)}
                   disabled={isExistingRequest}
-                >
-                  <option value="">Select an item...</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} {item.brand ? `(${item.brand})` : ''} {item.model ? `- ${item.model}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Search and select an item..."
+                />
+                {formData.item_id && (
+                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    Item linked to inventory
+                  </p>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
+              /* New item form */
+              <div className="bg-muted/30 p-4 rounded-xl space-y-4 border border-dashed border-border">
+                <div>
                   <label className="block text-sm font-medium mb-1">Item Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.item_name}
                     onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background"
+                    className="w-full px-3 py-2.5 border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                     placeholder="Enter item name"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Brand</label>
-                  <input
-                    type="text"
-                    value={formData.item_brand}
-                    onChange={(e) => setFormData({ ...formData, item_brand: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Model</label>
-                  <input
-                    type="text"
-                    value={formData.item_model}
-                    onChange={(e) => setFormData({ ...formData, item_model: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Brand</label>
+                    <input
+                      type="text"
+                      value={formData.item_brand}
+                      onChange={(e) => setFormData({ ...formData, item_brand: e.target.value })}
+                      className="w-full px-3 py-2.5 border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      placeholder="Brand name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Model</label>
+                    <input
+                      type="text"
+                      value={formData.item_model}
+                      onChange={(e) => setFormData({ ...formData, item_model: e.target.value })}
+                      className="w-full px-3 py-2.5 border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      placeholder="Model number"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Category</label>
                   <select
                     value={formData.item_category_id}
                     onChange={(e) => setFormData({ ...formData, item_category_id: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md bg-background"
+                    className="w-full px-3 py-2.5 border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                   >
                     <option value="">Select category...</option>
                     {categories.map((cat) => (
@@ -1035,6 +1076,17 @@ export default function ReorderRequestModal({
           </div>
         </form>
       )}
+
+      {/* Item Picker Overlay */}
+      <ItemPicker
+        items={items}
+        categories={categories}
+        selectedItemId={formData.item_id}
+        onSelect={handleItemPickerSelect}
+        onClose={() => setShowItemPicker(false)}
+        isOpen={showItemPicker}
+        disabled={isExistingRequest}
+      />
     </Modal>
   )
 }
