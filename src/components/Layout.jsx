@@ -74,7 +74,7 @@ export default function Layout() {
                 Locations
               </Link>
 
-              {(isAdmin || isCoordinator) && (
+              {isAdmin && (
                 <Link
                   to="/reorder-requests"
                   className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
@@ -94,13 +94,6 @@ export default function Layout() {
                 </Link>
               )}
 
-              <Link
-                to="/credits"
-                className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
-              >
-                <Heart className="h-4 w-4" />
-                Credits
-              </Link>
 
               <div className="flex items-center gap-3 ml-4 pl-4 border-l border-primary-foreground/30">
                 <div className="text-sm">
@@ -158,7 +151,7 @@ export default function Layout() {
                 Locations
               </Link>
 
-              {(isAdmin || isCoordinator) && (
+              {isAdmin && (
                 <Link
                   to="/reorder-requests"
                   onClick={() => setMobileMenuOpen(false)}
@@ -180,14 +173,7 @@ export default function Layout() {
                 </Link>
               )}
 
-              <Link
-                to="/credits"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 py-2 text-sm hover:opacity-80 transition-opacity"
-              >
-                <Heart className="h-5 w-5" />
-                Credits
-              </Link>
+
 
               <div className="pt-4 mt-4 border-t border-primary-foreground/30 space-y-3">
                 <div className="text-sm">

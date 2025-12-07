@@ -46,7 +46,7 @@ function App() {
             <Route
               path="reorder-requests"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'coordinator']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <ReorderRequests />
                 </ProtectedRoute>
               }

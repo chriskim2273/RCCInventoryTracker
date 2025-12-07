@@ -194,7 +194,7 @@ export default function Credits() {
         <p className="flex items-center justify-center gap-2">
           <span>RCC Inventory Tracker</span>
           <span className="text-muted-foreground/50">|</span>
-          <span>2024</span>
+          <span>2025</span>
         </p>
         <p className="mt-2 text-xs opacity-75">
           No Google Sheets were harmed in the making of this app

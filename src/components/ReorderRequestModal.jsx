@@ -47,12 +47,6 @@ const formatDateTime = (dateStr) => {
   })
 }
 
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount || 0)
-}
 
 export default function ReorderRequestModal({
   isOpen,
@@ -78,7 +72,6 @@ export default function ReorderRequestModal({
     priority: 'standard',
     quantity_to_order: 1,
     units_per_pack: '',
-    price_per_pack: '',
     order_link: '',
     location_id: '',
     notes: '',
@@ -118,7 +111,6 @@ export default function ReorderRequestModal({
           priority: request.priority || 'standard',
           quantity_to_order: request.quantity_to_order || 1,
           units_per_pack: request.units_per_pack || '',
-          price_per_pack: request.price_per_pack || '',
           order_link: request.order_link || '',
           location_id: request.location_id || '',
           notes: request.notes || '',
@@ -148,7 +140,6 @@ export default function ReorderRequestModal({
           priority: 'standard',
           quantity_to_order: 1,
           units_per_pack: '',
-          price_per_pack: '',
           order_link: preselectedItem.order_link || '',
           location_id: getCenterFromLocation(preselectedItem.location_id) || '',
           notes: '',
@@ -171,7 +162,6 @@ export default function ReorderRequestModal({
           priority: 'standard',
           quantity_to_order: 1,
           units_per_pack: '',
-          price_per_pack: '',
           order_link: '',
           location_id: '',
           notes: '',
@@ -261,12 +251,6 @@ export default function ReorderRequestModal({
     }
   }
 
-  const calculateTotalCost = () => {
-    const price = parseFloat(formData.price_per_pack) || 0
-    const qty = parseInt(formData.quantity_to_order) || 0
-    return (price * qty).toFixed(2)
-  }
-
   const calculateTotalUnits = () => {
     const qty = parseInt(formData.quantity_to_order) || 0
     const units = parseInt(formData.units_per_pack) || 1
@@ -289,9 +273,6 @@ export default function ReorderRequestModal({
       if (!formData.quantity_to_order || formData.quantity_to_order < 1) {
         throw new Error('Quantity must be at least 1')
       }
-      if (formData.price_per_pack === '' || parseFloat(formData.price_per_pack) < 0) {
-        throw new Error('Price per pack is required')
-      }
 
       const requestData = {
         item_id: formData.is_new_item ? null : (formData.item_id || null),
@@ -303,7 +284,6 @@ export default function ReorderRequestModal({
         item_category_id: formData.item_category_id || null,
         quantity_to_order: parseInt(formData.quantity_to_order),
         units_per_pack: formData.units_per_pack ? parseInt(formData.units_per_pack) : null,
-        price_per_pack: parseFloat(formData.price_per_pack),
         order_link: formData.order_link || null,
         location_id: formData.location_id,
         notes: formData.notes || null,
@@ -375,7 +355,6 @@ export default function ReorderRequestModal({
         priority: request.priority || 'standard',
         quantity_to_order: request.quantity_to_order || 1,
         units_per_pack: request.units_per_pack || '',
-        price_per_pack: request.price_per_pack || '',
         order_link: request.order_link || '',
         location_id: request.location_id || '',
         notes: request.notes || '',
@@ -505,7 +484,6 @@ export default function ReorderRequestModal({
 
   const statusConfig = STATUS_CONFIG[formData.status] || STATUS_CONFIG.new_request
   const priorityConfig = PRIORITY_CONFIG[formData.priority] || PRIORITY_CONFIG.standard
-  const totalCost = (parseFloat(formData.price_per_pack) || 0) * (parseInt(formData.quantity_to_order) || 0)
 
   // Determine modal title
   const getModalTitle = () => {
@@ -555,8 +533,8 @@ export default function ReorderRequestModal({
             )}
           </div>
 
-          {/* Quantity and Pricing */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {/* Quantity */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
               <span className="text-sm text-muted-foreground block">Quantity</span>
               <span className="font-medium text-lg">{formData.quantity_to_order}</span>
@@ -567,14 +545,6 @@ export default function ReorderRequestModal({
                 <span className="font-medium text-lg">{formData.units_per_pack}</span>
               </div>
             )}
-            <div>
-              <span className="text-sm text-muted-foreground block">Price/Pack</span>
-              <span className="font-medium text-lg">{formatCurrency(formData.price_per_pack)}</span>
-            </div>
-            <div>
-              <span className="text-sm text-muted-foreground block">Total Cost</span>
-              <span className="font-medium text-lg text-green-600 dark:text-green-400">{formatCurrency(totalCost)}</span>
-            </div>
           </div>
 
           {formData.units_per_pack && (
@@ -979,8 +949,8 @@ export default function ReorderRequestModal({
             </div>
           </div>
 
-          {/* Quantity and Price */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Quantity */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Quantity to Order *</label>
               <input
@@ -1009,39 +979,16 @@ export default function ReorderRequestModal({
                 </p>
               )}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Price per Pack ($) *</label>
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={formData.price_per_pack}
-                onChange={(e) => setFormData({ ...formData, price_per_pack: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md bg-background"
-                placeholder="0.00"
-              />
-              {formData.price_per_pack && formData.quantity_to_order && (
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
-                  Total cost: ${calculateTotalCost()}
-                </p>
-              )}
-            </div>
           </div>
 
-          {/* Order Link */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Order Link</label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                value={formData.order_link}
-                onChange={(e) => setFormData({ ...formData, order_link: e.target.value })}
-                className="flex-1 px-3 py-2 border rounded-md bg-background"
-                placeholder="https://..."
-              />
-              {formData.order_link && (
+          {/* Order Link - Auto-filled from item */}
+          {formData.order_link && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Order Link</label>
+              <div className="flex gap-2">
+                <div className="flex-1 px-3 py-2 border rounded-md bg-muted/50 text-muted-foreground truncate">
+                  {formData.order_link}
+                </div>
                 <a
                   href={formData.order_link}
                   target="_blank"
@@ -1051,9 +998,12 @@ export default function ReorderRequestModal({
                 >
                   <ExternalLink className="h-5 w-5" />
                 </a>
-              )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-filled from item. Edit the item directly to change.
+              </p>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           <div>

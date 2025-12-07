@@ -47,12 +47,6 @@ const formatDate = (dateStr) => {
   })
 }
 
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount || 0)
-}
 
 // Mobile Card Component
 const MobileRequestCard = memo(({ request, onClick }) => {
@@ -60,7 +54,6 @@ const MobileRequestCard = memo(({ request, onClick }) => {
   const priorityConfig = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG.standard
   const roleConfig = ROLE_CONFIG[request.requested_by_user?.role]
   const relevantDate = getRelevantDate(request)
-  const totalCost = (parseFloat(request.price_per_pack) || 0) * (parseInt(request.quantity_to_order) || 0)
 
   return (
     <div
@@ -96,12 +89,6 @@ const MobileRequestCard = memo(({ request, onClick }) => {
           <div className="font-medium mt-0.5">
             {request.quantity_to_order}
             {request.units_per_pack && ` (${request.units_per_pack}/pack)`}
-          </div>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Total Cost:</span>
-          <div className="font-medium mt-0.5 text-green-600 dark:text-green-400">
-            {formatCurrency(totalCost)}
           </div>
         </div>
         <div>
@@ -166,7 +153,6 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
   const priorityConfig = PRIORITY_CONFIG[request.priority] || PRIORITY_CONFIG.standard
   const roleConfig = ROLE_CONFIG[request.requested_by_user?.role]
   const relevantDate = getRelevantDate(request)
-  const totalCost = (parseFloat(request.price_per_pack) || 0) * (parseInt(request.quantity_to_order) || 0)
 
   return (
     <tr
@@ -200,9 +186,6 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
         {request.units_per_pack && (
           <span className="text-muted-foreground ml-1">({request.units_per_pack}/pk)</span>
         )}
-      </td>
-      <td className="px-4 py-3 text-sm font-medium text-green-600 dark:text-green-400">
-        {formatCurrency(totalCost)}
       </td>
       <td className="px-4 py-3 text-sm">
         {request.order_link ? (
@@ -641,7 +624,6 @@ export default function ReorderRequests() {
                   <th className="px-4 py-3 text-left text-sm font-medium">Item</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Qty</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Total</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Link</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
                   <th className="px-4 py-3 text-left text-sm font-medium">Requestor</th>
