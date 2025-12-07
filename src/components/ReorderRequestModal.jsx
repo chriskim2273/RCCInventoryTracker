@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
 import ItemPicker, { ItemPickerTrigger } from './ItemPicker'
-import { ExternalLink, Pencil, RefreshCw } from 'lucide-react'
+import { ExternalLink, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { value: 'new_request', label: 'New Request' },
@@ -91,6 +91,7 @@ export default function ReorderRequestModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [showItemPicker, setShowItemPicker] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Separate state for status update form
   const [statusFormData, setStatusFormData] = useState({
@@ -376,6 +377,7 @@ export default function ReorderRequestModal({
 
   const handleClose = () => {
     setMode('view')
+    setShowDeleteConfirm(false)
     onClose()
   }
 
@@ -520,6 +522,30 @@ export default function ReorderRequestModal({
     setError(null)
   }
 
+  // Handle delete
+  const handleDelete = async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('reorder_requests')
+        .delete()
+        .eq('id', request.id)
+
+      if (deleteError) throw deleteError
+
+      onSuccess()
+      onClose()
+    } catch (err) {
+      console.error('Error deleting reorder request:', err)
+      setError(err.message)
+      setShowDeleteConfirm(false)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const statusConfig = STATUS_CONFIG[formData.status] || STATUS_CONFIG.new_request
   const priorityConfig = PRIORITY_CONFIG[formData.priority] || PRIORITY_CONFIG.standard
 
@@ -661,35 +687,76 @@ export default function ReorderRequestModal({
             </div>
           )}
 
+          {/* Delete Confirmation */}
+          {showDeleteConfirm && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
+              <p className="text-sm font-medium text-destructive mb-3">
+                Are you sure you want to delete this request? This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={loading}
+                  className="px-3 py-1.5 text-sm border rounded-md hover:bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={loading}
+                  className="px-3 py-1.5 text-sm bg-destructive text-destructive-foreground rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {loading ? 'Deleting...' : 'Yes, Delete'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Footer Buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="px-4 py-2 border rounded-md hover:bg-secondary transition-colors"
-            >
-              Close
-            </button>
-            {canEdit && (
-              <>
+          <div className="flex justify-between pt-4 border-t">
+            <div>
+              {canEdit && !showDeleteConfirm && (
                 <button
                   type="button"
-                  onClick={() => setMode('status')}
-                  className="flex items-center gap-2 px-4 py-2 border border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  Update Status
+                  <Trash2 className="h-4 w-4" />
+                  Delete
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMode('edit')}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
-                >
-                  <Pencil className="h-4 w-4" />
-                  Edit
-                </button>
-              </>
-            )}
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-4 py-2 border rounded-md hover:bg-secondary transition-colors"
+              >
+                Close
+              </button>
+              {canEdit && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setMode('status')}
+                    className="flex items-center gap-2 px-4 py-2 border border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Update Status
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('edit')}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       ) : mode === 'status' ? (
