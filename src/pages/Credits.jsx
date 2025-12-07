@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom'
-import { Heart, Code, Sparkles, Lightbulb, ArrowLeft, Star, MessageCircle, Award } from 'lucide-react'
+import { Heart, Code, Sparkles, Lightbulb, Star, MessageCircle, Award } from 'lucide-react'
 
 export default function Credits() {
   const team = [
@@ -29,15 +28,6 @@ export default function Credits() {
 
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center py-8 px-4">
-      {/* Back button */}
-      <Link
-        to="/"
-        className="self-start mb-8 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Dashboard
-      </Link>
-
       {/* Header with sparkles */}
       <div className="text-center mb-12 relative">
         <div className="absolute -top-4 -left-4 animate-pulse">
