@@ -502,6 +502,31 @@ export default function ReorderRequestModal({
 
       if (updateError) throw updateError
 
+      // Send notification for status change (non-blocking)
+      // Only send if status actually changed
+      if (request.status !== statusFormData.status) {
+        try {
+          await supabase.functions.invoke('notify-admin-order-status-change', {
+            body: {
+              requestId: request.id,
+              oldStatus: request.status,
+              newStatus: statusFormData.status,
+              changedByUserId: user?.id,
+              changedByName: user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email : 'Unknown',
+              itemName: request.item_name,
+              itemBrand: request.item_brand,
+              locationId: request.location_id,
+              categoryId: request.item_category_id,
+              priority: request.priority,
+              quantity: request.quantity_to_order,
+            }
+          })
+        } catch (notifyError) {
+          // Don't fail the status update if notification fails
+          console.error('Failed to send status change notification:', notifyError)
+        }
+      }
+
       onSuccess()
       onClose()
     } catch (err) {

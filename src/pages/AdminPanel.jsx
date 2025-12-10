@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell } from 'lucide-react'
+import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell, ChevronDown, Check } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
@@ -51,8 +51,19 @@ export default function AdminPanel() {
   })
   const [notificationPreferences, setNotificationPreferences] = useState({
     new_user_signup: false,
+    order_request_status_change: {
+      enabled: false,
+      statuses: ['approved_pending', 'purchased', 'arrived', 'documented', 'rejected'],
+      centers: [],
+      categories: [],
+    },
   })
   const [savingPreferences, setSavingPreferences] = useState(false)
+  const [centers, setCenters] = useState([])
+  const [allCategories, setAllCategories] = useState([])
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
+  const [showCenterDropdown, setShowCenterDropdown] = useState(false)
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const { user: currentUser, canManageUsers } = useAuth()
 
   // Protected users that cannot be deleted
@@ -320,7 +331,16 @@ export default function AdminPanel() {
         }
 
         if (data?.notification_preferences) {
-          setNotificationPreferences(data.notification_preferences)
+          // Merge with defaults to ensure all keys exist
+          setNotificationPreferences({
+            new_user_signup: data.notification_preferences.new_user_signup ?? false,
+            order_request_status_change: {
+              enabled: data.notification_preferences.order_request_status_change?.enabled ?? false,
+              statuses: data.notification_preferences.order_request_status_change?.statuses ?? ['approved_pending', 'purchased', 'arrived', 'documented', 'rejected'],
+              centers: data.notification_preferences.order_request_status_change?.centers ?? [],
+              categories: data.notification_preferences.order_request_status_change?.categories ?? [],
+            },
+          })
         }
       } catch (error) {
         console.error('Error fetching notification preferences:', error)
@@ -329,6 +349,38 @@ export default function AdminPanel() {
 
     fetchNotificationPreferences()
   }, [currentUser?.id])
+
+  // Fetch centers and categories for notification settings
+  useEffect(() => {
+    const fetchCentersAndCategories = async () => {
+      try {
+        // Fetch top-level locations (centers)
+        const { data: centersData } = await supabase
+          .from('locations')
+          .select('id, name')
+          .is('parent_id', null)
+          .is('deleted_at', null)
+          .order('name')
+
+        setCenters(centersData || [])
+
+        // Fetch all categories
+        const { data: categoriesData } = await supabase
+          .from('categories')
+          .select('id, name')
+          .is('deleted_at', null)
+          .order('name')
+
+        setAllCategories(categoriesData || [])
+      } catch (error) {
+        console.error('Error fetching centers and categories:', error)
+      }
+    }
+
+    if (activeTab === 'settings') {
+      fetchCentersAndCategories()
+    }
+  }, [activeTab])
 
   const fetchData = async () => {
     setLoading(true)
@@ -2627,21 +2679,339 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              {/* Future Settings Placeholder */}
-              <div className="bg-card border rounded-lg overflow-hidden opacity-60">
+              {/* Order Request Status Change Notifications */}
+              <div className="bg-card border rounded-lg overflow-hidden">
                 <div className="px-6 py-4 border-b bg-muted/30">
                   <div className="flex items-center gap-2">
-                    <Settings className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold text-muted-foreground">Additional Settings</h3>
+                    <ClipboardList className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold">Order Request Status Notifications</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    More settings coming soon
+                    Receive email notifications when order request statuses are updated
                   </p>
                 </div>
-                <div className="p-6">
-                  <p className="text-sm text-muted-foreground italic">
-                    Additional admin settings and preferences will be available here in future updates.
-                  </p>
+
+                <div className="p-6 space-y-6">
+                  {/* Master Toggle */}
+                  <div className="flex items-start justify-between gap-4 p-4 rounded-lg border bg-background hover:bg-muted/30 transition-colors">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-primary" />
+                        <label className="text-sm font-medium cursor-pointer">
+                          Enable Order Request Notifications
+                        </label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Receive email alerts when order requests change status
+                      </p>
+                    </div>
+
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => {
+                          const newValue = !notificationPreferences.order_request_status_change?.enabled
+                          updateNotificationPreferences({
+                            ...notificationPreferences,
+                            order_request_status_change: {
+                              ...notificationPreferences.order_request_status_change,
+                              enabled: newValue
+                            }
+                          })
+                        }}
+                        disabled={savingPreferences}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${notificationPreferences.order_request_status_change?.enabled
+                          ? 'bg-primary'
+                          : 'bg-muted-foreground/30'
+                          } ${savingPreferences ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${notificationPreferences.order_request_status_change?.enabled
+                            ? 'translate-x-6'
+                            : 'translate-x-1'
+                            }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Configuration options (only shown when enabled) */}
+                  {notificationPreferences.order_request_status_change?.enabled && (
+                    <div className="space-y-4 pl-4 border-l-2 border-primary/20">
+                      {/* Status Selection */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Notify on these status changes:</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowStatusDropdown(!showStatusDropdown)
+                              setShowCenterDropdown(false)
+                              setShowCategoryDropdown(false)
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm border rounded-md bg-background hover:bg-muted/50 transition-colors"
+                          >
+                            <span className="text-muted-foreground">
+                              {notificationPreferences.order_request_status_change?.statuses?.length === 6
+                                ? 'All statuses'
+                                : notificationPreferences.order_request_status_change?.statuses?.length === 0
+                                  ? 'No statuses selected'
+                                  : `${notificationPreferences.order_request_status_change?.statuses?.length} status(es) selected`}
+                            </span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {showStatusDropdown && (
+                            <div className="absolute z-10 mt-1 w-full bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                              {[
+                                { value: 'new_request', label: 'New Request', color: 'bg-yellow-100 text-yellow-800' },
+                                { value: 'approved_pending', label: 'Approved / Pending', color: 'bg-blue-100 text-blue-800' },
+                                { value: 'purchased', label: 'Purchased', color: 'bg-purple-100 text-purple-800' },
+                                { value: 'arrived', label: 'Arrived', color: 'bg-orange-100 text-orange-800' },
+                                { value: 'documented', label: 'Documented', color: 'bg-green-100 text-green-800' },
+                                { value: 'rejected', label: 'Rejected', color: 'bg-red-100 text-red-800' },
+                              ].map((status) => {
+                                const isSelected = notificationPreferences.order_request_status_change?.statuses?.includes(status.value)
+                                return (
+                                  <button
+                                    key={status.value}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentStatuses = notificationPreferences.order_request_status_change?.statuses || []
+                                      const newStatuses = isSelected
+                                        ? currentStatuses.filter(s => s !== status.value)
+                                        : [...currentStatuses, status.value]
+                                      updateNotificationPreferences({
+                                        ...notificationPreferences,
+                                        order_request_status_change: {
+                                          ...notificationPreferences.order_request_status_change,
+                                          statuses: newStatuses
+                                        }
+                                      })
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                  >
+                                    <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                      {isSelected && <Check className="h-3 w-3 text-white" />}
+                                    </div>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${status.color}`}>
+                                      {status.label}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Selected statuses display */}
+                        {notificationPreferences.order_request_status_change?.statuses?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {notificationPreferences.order_request_status_change.statuses.map(status => {
+                              const statusConfig = {
+                                new_request: { label: 'New Request', color: 'bg-yellow-100 text-yellow-800' },
+                                approved_pending: { label: 'Approved / Pending', color: 'bg-blue-100 text-blue-800' },
+                                purchased: { label: 'Purchased', color: 'bg-purple-100 text-purple-800' },
+                                arrived: { label: 'Arrived', color: 'bg-orange-100 text-orange-800' },
+                                documented: { label: 'Documented', color: 'bg-green-100 text-green-800' },
+                                rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
+                              }[status]
+                              return (
+                                <span key={status} className={`px-2 py-0.5 rounded text-xs font-medium ${statusConfig?.color || 'bg-gray-100 text-gray-800'}`}>
+                                  {statusConfig?.label || status}
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Center Filter */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Filter by center (optional):</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCenterDropdown(!showCenterDropdown)
+                              setShowStatusDropdown(false)
+                              setShowCategoryDropdown(false)
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm border rounded-md bg-background hover:bg-muted/50 transition-colors"
+                          >
+                            <span className="text-muted-foreground">
+                              {notificationPreferences.order_request_status_change?.centers?.length === 0
+                                ? 'All centers'
+                                : `${notificationPreferences.order_request_status_change?.centers?.length} center(s) selected`}
+                            </span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${showCenterDropdown ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {showCenterDropdown && (
+                            <div className="absolute z-10 mt-1 w-full bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateNotificationPreferences({
+                                    ...notificationPreferences,
+                                    order_request_status_change: {
+                                      ...notificationPreferences.order_request_status_change,
+                                      centers: []
+                                    }
+                                  })
+                                  setShowCenterDropdown(false)
+                                }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors ${notificationPreferences.order_request_status_change?.centers?.length === 0 ? 'bg-muted/30' : ''}`}
+                              >
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">All centers</span>
+                              </button>
+                              <div className="border-t" />
+                              {centers.map((center) => {
+                                const isSelected = notificationPreferences.order_request_status_change?.centers?.includes(center.id)
+                                return (
+                                  <button
+                                    key={center.id}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentCenters = notificationPreferences.order_request_status_change?.centers || []
+                                      const newCenters = isSelected
+                                        ? currentCenters.filter(c => c !== center.id)
+                                        : [...currentCenters, center.id]
+                                      updateNotificationPreferences({
+                                        ...notificationPreferences,
+                                        order_request_status_change: {
+                                          ...notificationPreferences.order_request_status_change,
+                                          centers: newCenters
+                                        }
+                                      })
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                  >
+                                    <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                      {isSelected && <Check className="h-3 w-3 text-white" />}
+                                    </div>
+                                    <span>{center.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Selected centers display */}
+                        {notificationPreferences.order_request_status_change?.centers?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {notificationPreferences.order_request_status_change.centers.map(centerId => {
+                              const center = centers.find(c => c.id === centerId)
+                              return center ? (
+                                <span key={centerId} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  {center.name}
+                                </span>
+                              ) : null
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Category Filter */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Filter by category (optional):</label>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCategoryDropdown(!showCategoryDropdown)
+                              setShowStatusDropdown(false)
+                              setShowCenterDropdown(false)
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm border rounded-md bg-background hover:bg-muted/50 transition-colors"
+                          >
+                            <span className="text-muted-foreground">
+                              {notificationPreferences.order_request_status_change?.categories?.length === 0
+                                ? 'All categories'
+                                : `${notificationPreferences.order_request_status_change?.categories?.length} category(ies) selected`}
+                            </span>
+                            <ChevronDown className={`h-4 w-4 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {showCategoryDropdown && (
+                            <div className="absolute z-10 mt-1 w-full bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  updateNotificationPreferences({
+                                    ...notificationPreferences,
+                                    order_request_status_change: {
+                                      ...notificationPreferences.order_request_status_change,
+                                      categories: []
+                                    }
+                                  })
+                                  setShowCategoryDropdown(false)
+                                }}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors ${notificationPreferences.order_request_status_change?.categories?.length === 0 ? 'bg-muted/30' : ''}`}
+                              >
+                                <Tag className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">All categories</span>
+                              </button>
+                              <div className="border-t" />
+                              {allCategories.map((category) => {
+                                const isSelected = notificationPreferences.order_request_status_change?.categories?.includes(category.id)
+                                return (
+                                  <button
+                                    key={category.id}
+                                    type="button"
+                                    onClick={() => {
+                                      const currentCategories = notificationPreferences.order_request_status_change?.categories || []
+                                      const newCategories = isSelected
+                                        ? currentCategories.filter(c => c !== category.id)
+                                        : [...currentCategories, category.id]
+                                      updateNotificationPreferences({
+                                        ...notificationPreferences,
+                                        order_request_status_change: {
+                                          ...notificationPreferences.order_request_status_change,
+                                          categories: newCategories
+                                        }
+                                      })
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                                  >
+                                    <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                      {isSelected && <Check className="h-3 w-3 text-white" />}
+                                    </div>
+                                    <span>{category.name}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Selected categories display */}
+                        {notificationPreferences.order_request_status_change?.categories?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {notificationPreferences.order_request_status_change.categories.map(categoryId => {
+                              const category = allCategories.find(c => c.id === categoryId)
+                              return category ? (
+                                <span key={categoryId} className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                  {category.name}
+                                </span>
+                              ) : null
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Current Status */}
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Current Status:</span>
+                      <span className={`font-medium ${notificationPreferences.order_request_status_change?.enabled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                        {notificationPreferences.order_request_status_change?.enabled ? '✓ Notifications Enabled' : '✗ Notifications Disabled'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -63,6 +63,51 @@ Updates user metadata including email, password, and ban status.
 }
 ```
 
+### 5. `notify-admin-new-user`
+Sends email notifications to admins who have opted in when a new user signs up.
+
+**Request Body:**
+```json
+{
+  "userId": "uuid-of-new-user",
+  "userEmail": "newuser@example.com",
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+
+**Note:** Requires Gmail SMTP credentials to be configured:
+- `GMAIL_USERNAME` - Gmail address for sending
+- `GMAIL_APP_PASSWORD` - Gmail App Password (16-character, not regular password)
+- `SITE_URL` - Application URL for email links
+
+### 6. `notify-admin-order-status-change`
+Sends email notifications to admins who have opted in when an order request status changes.
+
+**Request Body:**
+```json
+{
+  "requestId": "uuid-of-order-request",
+  "oldStatus": "new_request",
+  "newStatus": "approved_pending",
+  "changedByUserId": "uuid-of-user-who-made-change",
+  "changedByName": "John Doe",
+  "itemName": "Item Name",
+  "itemBrand": "Brand Name",           // Optional
+  "locationId": "uuid-of-location",
+  "categoryId": "uuid-of-category",    // Optional
+  "priority": "high",                  // "high" or "standard"
+  "quantity": 10
+}
+```
+
+**Filtering:** Admins can configure their notification preferences to filter by:
+- **Statuses**: Which status changes trigger notifications
+- **Centers**: Only receive notifications for specific centers (locations)
+- **Categories**: Only receive notifications for specific item categories
+
+**Note:** Uses the same Gmail SMTP configuration as `notify-admin-new-user`.
+
 ## Prerequisites
 
 1. **Supabase CLI** - Install the Supabase CLI:
