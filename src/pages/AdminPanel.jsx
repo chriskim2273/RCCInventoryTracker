@@ -400,39 +400,6 @@ export default function AdminPanel() {
             .order('created_at', { ascending: false })
           setUsers(data || [])
         }
-      } else if (activeTab === 'items') {
-        // Fetch items and users separately since we removed the FK constraint
-        const [itemsResult, usersResult] = await Promise.all([
-          supabase
-            .from('items')
-            .select(`
-              *,
-              *,
-              category:categories(name),
-              location:locations(name, path)
-            `)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false }),
-          supabase
-            .from('users')
-            .select('id, email, first_name, last_name')
-        ])
-
-        // Manually join users to items
-        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
-        const itemsWithUsers = (itemsResult.data || []).map(item => ({
-          ...item,
-          created_by_user: item.created_by ? usersMap.get(item.created_by) : null
-        }))
-
-        setItems(itemsWithUsers)
-      } else if (activeTab === 'locations') {
-        const { data } = await supabase
-          .from('locations')
-          .select('*')
-          .is('deleted_at', null)
-          .order('path')
-        setLocations(data || [])
       } else if (activeTab === 'categories') {
         const { data } = await supabase.from('categories').select('*').is('deleted_at', null).order('name')
         setCategories(data || [])
@@ -1105,27 +1072,7 @@ export default function AdminPanel() {
             Users
           </button>
 
-          <button
-            onClick={() => setActiveTab('items')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'items'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-primary'
-              }`}
-          >
-            <Package className="h-4 w-4" />
-            Items
-          </button>
 
-          <button
-            onClick={() => setActiveTab('locations')}
-            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'locations'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-primary'
-              }`}
-          >
-            <MapPin className="h-4 w-4" />
-            Locations
-          </button>
 
           <button
             onClick={() => setActiveTab('categories')}
@@ -1327,293 +1274,133 @@ export default function AdminPanel() {
                     Showing {filteredUsers.length} of {users.length} users
                   </span>
                 </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Role</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Last Sign In</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Change Role</th>
-                      {canManageUsers && (
-                        <th className="px-4 py-3 text-left text-sm font-medium">Admin Actions</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-medium">
-                          {user.first_name && user.last_name
-                            ? `${user.first_name} ${user.last_name}`
-                            : 'N/A'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {user.confirmed ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                <CheckCircle className="h-3 w-3" />
-                                Verified
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                <XCircle className="h-3 w-3" />
-                                Unverified
-                              </span>
-                            )}
-                            {user.banned && (
-                              <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                Banned
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
-                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                              : user.role === 'coordinator'
-                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
-                                : user.role === 'editor'
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                  : user.role === 'viewer'
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                              }`}
-                          >
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {user.last_sign_in_at
-                            ? new Date(user.last_sign_in_at).toLocaleDateString()
-                            : 'Never'}
-                        </td>
-                        <td className="px-4 py-3">
-                          {canManageUsers ? (
-                            <select
-                              value={user.role}
-                              onChange={(e) => prepareRoleChange(user, e.target.value)}
-                              className="text-sm border rounded px-2 py-1 bg-background"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="viewer">Viewer</option>
-                              <option value="editor">Editor</option>
-                              <option value="coordinator">Coordinator</option>
-                              <option value="admin">Admin</option>
-                            </select>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              No permission
-                            </span>
-                          )}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Role</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Last Sign In</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Change Role</th>
                         {canManageUsers && (
+                          <th className="px-4 py-3 text-left text-sm font-medium">Admin Actions</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 font-medium">
+                            {user.first_name && user.last_name
+                              ? `${user.first_name} ${user.last_name}`
+                              : 'N/A'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              {!user.confirmed && (
-                                <button
-                                  onClick={() => handleResendConfirmation(user.email)}
-                                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                  title="Resend confirmation email"
-                                >
-                                  <Mail className="h-4 w-4" />
-                                </button>
+                              {user.confirmed ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  <CheckCircle className="h-3 w-3" />
+                                  Verified
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                  <XCircle className="h-3 w-3" />
+                                  Unverified
+                                </span>
                               )}
-                              <button
-                                onClick={() => handleResetPassword(user.id, user.email)}
-                                className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
-                                title="Reset password"
-                              >
-                                <Key className="h-4 w-4" />
-                              </button>
-                              {user.id !== currentUser.id && !isProtectedUser(user.email) && (
-                                <button
-                                  onClick={() => handleDeleteUser(user.id, user.email)}
-                                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                  title="Delete user"
-                                >
-                                  <UserX className="h-4 w-4" />
-                                </button>
+                              {user.banned && (
+                                <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                  Banned
+                                </span>
                               )}
                             </div>
                           </td>
-                        )}
-                      </tr>
-                    ))}
-                    {filteredUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={canManageUsers ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">
-                          No users match your filters
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'items' && (
-            <div>
-              <div className="mb-4">
-                <button
-                  onClick={() => {
-                    setEditingItem(null)
-                    setShowItemModal(true)
-                  }}
-                  className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Item
-                </button>
-              </div>
-
-              <div className="bg-card border rounded-lg overflow-hidden">
-                <div className="p-4 border-b bg-muted/30">
-                  <h2 className="text-lg font-semibold">All Items ({items.length})</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Manage and delete items</p>
-                </div>
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Quantity</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Created By</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {items.map((item) => (
-                      <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <div>
-                            <Link to={`/items/${item.id}`} className="font-medium text-primary hover:underline">
-                              {item.name}
-                            </Link>
-                            {item.serial_number && (
-                              <p className="text-xs text-muted-foreground">SN: {item.serial_number}</p>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                : user.role === 'coordinator'
+                                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+                                  : user.role === 'editor'
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                    : user.role === 'viewer'
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                }`}
+                            >
+                              {user.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {user.last_sign_in_at
+                              ? new Date(user.last_sign_in_at).toLocaleDateString()
+                              : 'Never'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {canManageUsers ? (
+                              <select
+                                value={user.role}
+                                onChange={(e) => prepareRoleChange(user, e.target.value)}
+                                className="text-sm border rounded px-2 py-1 bg-background"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="viewer">Viewer</option>
+                                <option value="editor">Editor</option>
+                                <option value="coordinator">Coordinator</option>
+                                <option value="admin">Admin</option>
+                              </select>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                No permission
+                              </span>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {item.category?.name ? (
-                            <Link to={`/items?category=${item.category_id}`} className="text-primary hover:underline">
-                              {item.category.name}
-                            </Link>
-                          ) : 'N/A'}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <div>
-                            {item.location?.name ? (
-                              <Link to={`/locations/${item.location.id}`} className="text-primary hover:underline">
-                                {item.location.name}
-                              </Link>
-                            ) : 'N/A'}
-                            {item.location?.path && (
-                              <p className="text-xs text-muted-foreground">{item.location.path}</p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                        <td className="px-4 py-3 text-sm">{getUserDisplayName(item.created_by_user, item.created_by_name)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingItem(item)
-                                setShowItemModal(true)
-                              }}
-                              className="text-primary hover:underline text-sm"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => prepareDeleteItem(item.id, item.name)}
-                              className="text-destructive hover:underline text-sm"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'locations' && (
-            <div>
-              <div className="mb-4">
-                <button
-                  onClick={() => {
-                    setEditingLocation(null)
-                    setShowLocationModal(true)
-                  }}
-                  className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Location
-                </button>
-              </div>
-
-              <div className="bg-card border rounded-lg overflow-hidden">
-                <div className="p-4 border-b bg-muted/30">
-                  <h2 className="text-lg font-semibold">All Locations ({locations.length})</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Manage and delete locations</p>
+                          </td>
+                          {canManageUsers && (
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                {!user.confirmed && (
+                                  <button
+                                    onClick={() => handleResendConfirmation(user.email)}
+                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                    title="Resend confirmation email"
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleResetPassword(user.id, user.email)}
+                                  className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
+                                  title="Reset password"
+                                >
+                                  <Key className="h-4 w-4" />
+                                </button>
+                                {user.id !== currentUser.id && !isProtectedUser(user.email) && (
+                                  <button
+                                    onClick={() => handleDeleteUser(user.id, user.email)}
+                                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                    title="Delete user"
+                                  >
+                                    <UserX className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                      {filteredUsers.length === 0 && (
+                        <tr>
+                          <td colSpan={canManageUsers ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">
+                            No users match your filters
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Full Path</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Parent</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {locations.map((location) => (
-                      <tr key={location.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <Link to={`/locations/${location.id}`} className="font-medium text-primary hover:underline">
-                            {location.name}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {location.parent_id ? 'Has parent' : 'Root level'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setEditingLocation(location)
-                                setShowLocationModal(true)
-                              }}
-                              className="text-primary hover:underline text-sm"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => prepareDeleteLocation(location.id, location.name)}
-                              className="text-destructive hover:underline text-sm"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             </div>
           )}
