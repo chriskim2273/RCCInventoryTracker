@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
 import ItemPicker, { ItemPickerTrigger } from './ItemPicker'
-import { ExternalLink, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import CreateItemFromRequestModal from './CreateItemFromRequestModal'
+import { ExternalLink, Pencil, RefreshCw, Trash2, PackagePlus } from 'lucide-react'
 
 const STATUS_OPTIONS = [
   { value: 'new_request', label: 'New Request' },
@@ -92,6 +93,7 @@ export default function ReorderRequestModal({
   const [error, setError] = useState(null)
   const [showItemPicker, setShowItemPicker] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showCreateItemModal, setShowCreateItemModal] = useState(false)
 
   // Separate state for status update form
   const [statusFormData, setStatusFormData] = useState({
@@ -378,6 +380,7 @@ export default function ReorderRequestModal({
   const handleClose = () => {
     setMode('view')
     setShowDeleteConfirm(false)
+    setShowCreateItemModal(false)
     onClose()
   }
 
@@ -738,6 +741,17 @@ export default function ReorderRequestModal({
               </button>
               {canEdit && (
                 <>
+                  {/* Create as Item button - shown when arrived and not linked to existing item */}
+                  {request?.status === 'arrived' && !request?.item_id && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateItemModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 border border-green-300 text-green-700 dark:border-green-700 dark:text-green-300 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                    >
+                      <PackagePlus className="h-4 w-4" />
+                      Create as Item
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setMode('status')}
@@ -973,6 +987,19 @@ export default function ReorderRequestModal({
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Order Link</label>
+                  <input
+                    type="url"
+                    value={formData.order_link}
+                    onChange={(e) => setFormData({ ...formData, order_link: e.target.value })}
+                    className="w-full px-3 py-2.5 border rounded-xl bg-background focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    URL for ordering this item (optional)
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -1160,6 +1187,18 @@ export default function ReorderRequestModal({
         onClose={() => setShowItemPicker(false)}
         isOpen={showItemPicker}
         disabled={isExistingRequest}
+      />
+
+      {/* Create Item from Request Modal */}
+      <CreateItemFromRequestModal
+        isOpen={showCreateItemModal}
+        onClose={() => setShowCreateItemModal(false)}
+        onSuccess={() => {
+          setShowCreateItemModal(false)
+          onSuccess()
+          onClose()
+        }}
+        request={request}
       />
     </Modal>
   )
