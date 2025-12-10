@@ -2680,8 +2680,8 @@ export default function AdminPanel() {
               </div>
 
               {/* Order Request Status Change Notifications */}
-              <div className="bg-card border rounded-lg overflow-hidden">
-                <div className="px-6 py-4 border-b bg-muted/30">
+              <div className="bg-card border rounded-lg">
+                <div className="px-6 py-4 border-b bg-muted/30 rounded-t-lg">
                   <div className="flex items-center gap-2">
                     <ClipboardList className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-semibold">Order Request Status Notifications</h3>
