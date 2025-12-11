@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
@@ -95,6 +96,10 @@ export default function ReorderRequestModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showCreateItemModal, setShowCreateItemModal] = useState(false)
 
+  // State for Quick Quantity Update
+  const [quickQty, setQuickQty] = useState('')
+  const [updatingQty, setUpdatingQty] = useState(false)
+
   // Separate state for status update form
   const [statusFormData, setStatusFormData] = useState({
     status: 'new_request',
@@ -131,6 +136,12 @@ export default function ReorderRequestModal({
           purchased_by_name: request.purchased_by_name || '',
           use_registered_purchaser: !!request.purchased_by || !request.purchased_by_name,
         })
+
+        // Fetch current quantity if item exists
+        if (request.item_id) {
+          fetchCurrentItemQuantity(request.item_id)
+        }
+
         // Initialize status form data
         setStatusFormData({
           status: request.status || 'new_request',
@@ -577,6 +588,79 @@ export default function ReorderRequestModal({
   const statusConfig = STATUS_CONFIG[formData.status] || STATUS_CONFIG.new_request
   const priorityConfig = PRIORITY_CONFIG[formData.priority] || PRIORITY_CONFIG.standard
 
+  const fetchCurrentItemQuantity = async (itemId) => {
+    try {
+      const { data, error } = await supabase
+        .from('items')
+        .select('quantity')
+        .eq('id', itemId)
+        .single()
+
+      if (data && !error) {
+        setQuickQty(data.quantity)
+      }
+    } catch (err) {
+      console.error('Error fetching item quantity:', err)
+    }
+  }
+
+  const handleQuickQuantityUpdate = async () => {
+    if (!formData.item_id || !quickQty) return
+
+    setUpdatingQty(true)
+    setError(null)
+
+    try {
+      const newQty = parseInt(quickQty)
+      if (isNaN(newQty) || newQty < 0) {
+        throw new Error('Please enter a valid quantity')
+      }
+
+      // 1. Update item quantity
+      const { error: itemError } = await supabase
+        .from('items')
+        .update({ quantity: newQty })
+        .eq('id', formData.item_id)
+
+      if (itemError) throw itemError
+
+      // 2. Update reorder request
+      const { error: requestError } = await supabase
+        .from('reorder_requests')
+        .update({ quantity_updated_at: new Date().toISOString() })
+        .eq('id', request.id)
+
+      if (requestError) throw requestError
+
+      // 3. Log the change
+      const { error: logError } = await supabase
+        .from('item_logs')
+        .insert({
+          item_id: formData.item_id,
+          user_id: user.id,
+          user_name: user.first_name ? `${user.first_name} ${user.last_name}` : user.email,
+          action: 'update',
+          details: {
+            field: 'quantity',
+            value: newQty,
+            source: 'reorder_request_quick_update',
+            request_id: request.id
+          }
+        })
+
+      if (logError) console.error('Error logging quantity update:', logError)
+
+      onSuccess() // Refresh parent data
+      alert('Quantity updated successfully!')
+
+    } catch (err) {
+      console.error('Error updating quantity:', err)
+      setError(err.message)
+    } finally {
+      setUpdatingQty(false)
+    }
+  }
+
   // Determine modal title
   const getModalTitle = () => {
     if (!isExistingRequest) return 'New Reorder Request'
@@ -607,8 +691,19 @@ export default function ReorderRequestModal({
 
           {/* Item Details */}
           <div className="bg-muted/50 p-4 rounded-lg">
-            <h3 className="font-semibold text-lg">
-              {formData.item_name}
+            <h3 className="font-semibold text-lg flex items-center">
+              {formData.item_id ? (
+                <Link
+                  to={`/items/${formData.item_id}`}
+                  target="_blank"
+                  className="hover:underline flex items-center gap-2"
+                >
+                  {formData.item_name}
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                </Link>
+              ) : (
+                formData.item_name
+              )}
               {formData.item_brand && <span className="text-muted-foreground font-normal ml-2">({formData.item_brand})</span>}
             </h3>
             {formData.item_model && (
@@ -618,10 +713,51 @@ export default function ReorderRequestModal({
               <span className="text-muted-foreground">Category:</span>
               <span>{getCategoryDisplay()}</span>
             </div>
-            {formData.item_id && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Linked to existing inventory item. Category inherited from item.
-              </p>
+
+            {/* Quick Quantity Update - Minimalist */}
+            {mode === 'view' && formData.item_id && canEdit && (
+              <div className={`mt-4 pt-3 border-t ${request?.quantity_updated_at ? 'border-yellow-200/50 dark:border-yellow-900/30' : 'border-border/10'}`}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <PackagePlus className="h-3 w-3" />
+                        Quick Update Quantity
+                      </label>
+                      {request?.quantity_updated_at && (
+                        <span className="text-[10px] text-yellow-600 dark:text-yellow-400 font-medium bg-yellow-100/50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded">
+                          Updated {formatDate(request.quantity_updated_at)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={quickQty}
+                        onChange={(e) => setQuickQty(e.target.value)}
+                        className={`h-8 w-24 px-2 text-sm border rounded bg-background/50 focus:bg-background transition-colors ${request?.quantity_updated_at ? 'border-yellow-200 focus:border-yellow-400 dark:border-yellow-900 dark:focus:border-yellow-700' : ''}`}
+                        placeholder="Qty"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleQuickQuantityUpdate}
+                        disabled={updatingQty}
+                        className={`h-8 px-3 text-xs font-medium rounded transition-colors ${request?.quantity_updated_at
+                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:hover:bg-yellow-900/50'
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'}`}
+                      >
+                        {updatingQty ? '...' : 'Update'}
+                      </button>
+                    </div>
+                    {request?.quantity_updated_at && (
+                      <p className="text-[10px] text-yellow-600/80 dark:text-yellow-400/80 mt-1.5">
+                        ⚠️ Already updated for this request.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -921,11 +1057,10 @@ export default function ReorderRequestModal({
                 type="button"
                 onClick={() => setFormData({ ...formData, is_new_item: false, item_id: '', item_name: '', item_brand: '', item_model: '', item_category_id: '' })}
                 disabled={isExistingRequest}
-                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  !formData.is_new_item
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                } ${isExistingRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${!formData.is_new_item
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+                  } ${isExistingRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 Existing Item
               </button>
@@ -933,11 +1068,10 @@ export default function ReorderRequestModal({
                 type="button"
                 onClick={() => setFormData({ ...formData, is_new_item: true, item_id: '' })}
                 disabled={isExistingRequest}
-                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  formData.is_new_item
-                    ? 'bg-background shadow-sm text-foreground'
-                    : 'text-muted-foreground hover:text-foreground'
-                } ${isExistingRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${formData.is_new_item
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+                  } ${isExistingRequest ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 New Item
               </button>
@@ -1049,22 +1183,20 @@ export default function ReorderRequestModal({
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, priority: 'standard' })}
-                  className={`flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
-                    formData.priority === 'standard'
-                      ? 'bg-gray-100 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100'
-                      : 'bg-background border-border text-muted-foreground hover:bg-muted'
-                  }`}
+                  className={`flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${formData.priority === 'standard'
+                    ? 'bg-gray-100 border-gray-400 text-gray-800 dark:bg-gray-700 dark:border-gray-500 dark:text-gray-100'
+                    : 'bg-background border-border text-muted-foreground hover:bg-muted'
+                    }`}
                 >
                   Standard
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, priority: 'high' })}
-                  className={`flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${
-                    formData.priority === 'high'
-                      ? 'bg-red-100 border-red-400 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200'
-                      : 'bg-background border-border text-muted-foreground hover:bg-muted'
-                  }`}
+                  className={`flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors ${formData.priority === 'high'
+                    ? 'bg-red-100 border-red-400 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200'
+                    : 'bg-background border-border text-muted-foreground hover:bg-muted'
+                    }`}
                 >
                   High
                 </button>

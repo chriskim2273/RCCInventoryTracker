@@ -94,10 +94,55 @@ export default function AdminPanel() {
   const [userRoleFilter, setUserRoleFilter] = useState('all')
   const [userStatusFilter, setUserStatusFilter] = useState('all')
 
-  const formatValue = (value) => {
-    if (value === null || value === undefined) return 'null'
-    if (typeof value === 'boolean') return value ? 'true' : 'false'
+  const formatFieldName = (key) => {
+    const fieldNames = {
+      name: 'Name',
+      brand: 'Brand',
+      model: 'Model',
+      serial_number: 'Serial Number',
+      stony_brook_asset_tag: 'Asset Tag',
+      quantity: 'Quantity',
+      min_quantity: 'Min Quantity',
+      is_unique: 'Unique Item',
+      category_id: 'Category',
+      location_id: 'Location',
+      checked_out_by: 'Checked Out By',
+      image_url: 'Image',
+      description: 'Description',
+      deleted_at: 'Deleted At',
+      deleted_by: 'Deleted By',
+      units_per_pack: 'Units Per Pack',
+      order_link: 'Order Link',
+      status: 'Status',
+      notes: 'Notes',
+    }
+    return fieldNames[key] || key
+  }
+
+  const formatValue = (value, key) => {
+    if (value === null || value === undefined) return 'None'
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+
+    // Handle specific ID fields
+    if (key === 'location_id') {
+      const loc = locations.find(l => l.id === value)
+      return loc ? (loc.path || loc.name) : 'Unknown Location'
+    }
+    if (key === 'category_id') {
+      const cat = categories.find(c => c.id === value)
+      return cat ? cat.name : 'Unknown Category'
+    }
+    if ((key === 'checked_out_by' || key === 'created_by' || key === 'user_id' || key === 'deleted_by') && typeof value === 'string') {
+      const u = users.find(u => u.id === value)
+      return u ? getUserDisplayName(u) : 'Unknown User'
+    }
+
     if (typeof value === 'string' && value.length === 0) return '(empty)'
+
+    // Check if it's a UUID (category_id, location_id, etc)
+    if (typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      return '(changed)'
+    }
     return String(value)
   }
 
@@ -404,8 +449,8 @@ export default function AdminPanel() {
         const { data } = await supabase.from('categories').select('*').is('deleted_at', null).order('name')
         setCategories(data || [])
       } else if (activeTab === 'audit') {
-        // Fetch item logs, items, and users separately since we removed the FK constraints
-        const [logsResult, itemsResult, usersResult] = await Promise.all([
+        // Fetch item logs, items, users, locations, and categories
+        const [logsResult, itemsResult, usersResult, locationsResult, categoriesResult] = await Promise.all([
           supabase
             .from('item_logs')
             .select('*')
@@ -417,7 +462,13 @@ export default function AdminPanel() {
           // Note: We fetch ALL items (including deleted) so audit trail can show names for deleted items
           supabase
             .from('users')
-            .select('id, email, first_name, last_name')
+            .select('id, email, first_name, last_name'),
+          supabase
+            .from('locations')
+            .select('id, name, path'),
+          supabase
+            .from('categories')
+            .select('id, name')
         ])
 
         // Manually join items and users to logs
@@ -429,6 +480,10 @@ export default function AdminPanel() {
           user: log.user_id ? usersMap.get(log.user_id) : null
         }))
 
+        // Update states for lookups
+        setUsers(usersResult.data || [])
+        setLocations(locationsResult.data || [])
+        setCategories(categoriesResult.data || [])
         setAuditLogs(logsWithJoins)
       } else if (activeTab === 'admin-audit') {
         // Fetch audit logs and users separately since we removed the FK constraint
@@ -1603,8 +1658,8 @@ export default function AdminPanel() {
                                   if (['id', 'created_at', 'updated_at', 'created_by', 'deleted_at', 'deleted_by'].includes(key)) return null
                                   return (
                                     <div key={key} className="flex items-start gap-2">
-                                      <span className="text-muted-foreground min-w-32">{key}:</span>
-                                      <span className="font-medium flex-1">{formatValue(value)}</span>
+                                      <span className="text-muted-foreground min-w-32">{formatFieldName(key)}:</span>
+                                      <span className="font-medium flex-1">{formatValue(value, key)}</span>
                                     </div>
                                   )
                                 })}
@@ -1622,14 +1677,14 @@ export default function AdminPanel() {
                                   if (oldValue === newValue) return null
                                   return (
                                     <div key={key} className="flex items-start gap-2 bg-muted/30 rounded-lg p-3">
-                                      <span className="text-muted-foreground min-w-32 font-medium">{key}:</span>
+                                      <span className="text-muted-foreground min-w-32 font-medium">{formatFieldName(key)}:</span>
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="line-through text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded">
-                                          {formatValue(oldValue)}
+                                          {formatValue(oldValue, key)}
                                         </span>
                                         <span className="text-muted-foreground">→</span>
                                         <span className="text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded">
-                                          {formatValue(newValue)}
+                                          {formatValue(newValue, key)}
                                         </span>
                                       </div>
                                     </div>

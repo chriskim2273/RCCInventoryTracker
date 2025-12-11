@@ -19,6 +19,9 @@ export default function ItemDetail() {
   const [checkoutLogs, setCheckoutLogs] = useState([])
   const [activeCheckouts, setActiveCheckouts] = useState([])
   const [availability, setAvailability] = useState({ availableQuantity: 0, checkedOutQuantity: 0 })
+  const [usersMap, setUsersMap] = useState(new Map())
+  const [locationsMap, setLocationsMap] = useState(new Map())
+  const [categoriesMap, setCategoriesMap] = useState(new Map())
   const [loading, setLoading] = useState(true)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
@@ -159,11 +162,24 @@ export default function ItemDetail() {
           .order('checked_out_at', { ascending: false }),
         supabase
           .from('users')
-          .select('id, email, first_name, last_name')
+          .select('id, email, first_name, last_name'),
+        supabase
+          .from('locations')
+          .select('id, name, path'),
+        supabase
+          .from('categories')
+          .select('id, name')
       ])
 
-      // Manually join users to item
+      // Create maps for lookups
       const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+      const locationsMap = new Map((locationsResult.data || []).map(loc => [loc.id, loc]))
+      const categoriesMap = new Map((categoriesResult.data || []).map(cat => [cat.id, cat]))
+
+      setUsersMap(usersMap)
+      setLocationsMap(locationsMap)
+      setCategoriesMap(categoriesMap)
+
       const itemWithUsers = {
         ...itemResult.data,
         created_by_user: itemResult.data?.created_by ? usersMap.get(itemResult.data.created_by) : null,
@@ -310,11 +326,33 @@ export default function ItemDetail() {
     return fieldNames[key] || key
   }
 
-  const formatValue = (value) => {
+  const formatValue = (value, key) => {
     if (value === null || value === undefined) return 'None'
     if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+
+    // Handle specific ID fields
+    if (key === 'location_id') {
+      if (locationsMap.has(value)) {
+        return locationsMap.get(value).path || locationsMap.get(value).name
+      }
+      return 'Unknown Location'
+    }
+    if (key === 'category_id') {
+      if (categoriesMap.has(value)) {
+        return categoriesMap.get(value).name
+      }
+      return 'Unknown Category'
+    }
+    if ((key === 'checked_out_by' || key === 'created_by' || key === 'user_id' || key === 'deleted_by') && typeof value === 'string') {
+      if (usersMap.has(value)) {
+        return getUserDisplayName(usersMap.get(value))
+      }
+      return 'Unknown User'
+    }
+
     if (typeof value === 'string' && value.length === 0) return '(empty)'
-    // Check if it's a UUID (category_id, location_id, etc)
+
+    // Check if it's a UUID (only if not one of the specific keys above)
     if (typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
       return '(changed)'
     }
@@ -572,14 +610,14 @@ export default function ItemDetail() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span
                               className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${log.action === 'create'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : log.action === 'update'
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                    : log.action === 'check_out'
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                      : log.action === 'check_in'
-                                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : log.action === 'update'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  : log.action === 'check_out'
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                    : log.action === 'check_in'
+                                      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                 }`}
                             >
                               {log.action.replace('_', ' ')}
@@ -608,7 +646,7 @@ export default function ItemDetail() {
                                     return (
                                       <p key={key}>
                                         <span className="text-muted-foreground">{formatFieldName(key)}:</span>{' '}
-                                        <span className="font-medium">{formatValue(value)}</span>
+                                        <span className="font-medium">{formatValue(value, key)}</span>
                                       </p>
                                     )
                                   })}
@@ -640,11 +678,11 @@ export default function ItemDetail() {
                                         <span className="text-muted-foreground min-w-32">{formatFieldName(key)}:</span>
                                         <div className="flex-1">
                                           <span className="line-through text-red-600 dark:text-red-400">
-                                            {formatValue(oldValue)}
+                                            {formatValue(oldValue, key)}
                                           </span>
                                           {' → '}
                                           <span className="text-green-600 dark:text-green-400 font-medium">
-                                            {formatValue(newValue)}
+                                            {formatValue(newValue, key)}
                                           </span>
                                         </div>
                                       </div>
@@ -672,9 +710,9 @@ export default function ItemDetail() {
                                                   <div key={key} className="flex items-start gap-2">
                                                     <span className="text-muted-foreground min-w-24">{formatFieldName(key)}:</span>
                                                     <div className="flex-1">
-                                                      <span className="text-red-600 dark:text-red-400">{formatValue(oldVal)}</span>
+                                                      <span className="text-red-600 dark:text-red-400">{formatValue(oldVal, key)}</span>
                                                       {' → '}
-                                                      <span className="text-green-600 dark:text-green-400">{formatValue(newVal)}</span>
+                                                      <span className="text-green-600 dark:text-green-400">{formatValue(newVal, key)}</span>
                                                     </div>
                                                   </div>
                                                 )

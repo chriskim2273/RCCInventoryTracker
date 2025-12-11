@@ -42,7 +42,8 @@ TABLES = [
     'items',
     'item_logs',
     'checkout_logs',
-    'audit_logs'
+    'audit_logs',
+    'reorder_requests'
 ]
 
 def create_table_from_data(table_name, sample_record, cursor):
