@@ -139,7 +139,7 @@ export default function ItemDetail() {
 
     try {
       // Fetch item, logs, checkout logs, and users separately since we removed FK constraints
-      const [itemResult, logsData, checkoutLogsData, usersResult] = await Promise.all([
+      const [itemResult, logsData, checkoutLogsData, usersResult, locationsResult, categoriesResult] = await Promise.all([
         supabase
           .from('items')
           .select(`
