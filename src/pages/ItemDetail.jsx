@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatTimestamp, formatDate } from '@/lib/utils'
-import { ArrowLeft, Edit, Trash2, Plus, Minus, UserCheck, UserX, ChevronDown, ChevronRight, History, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Plus, Minus, UserCheck, UserX, ChevronDown, ChevronRight, History, RefreshCw, Lock, MessageSquare, Check, X } from 'lucide-react'
 import ItemModal from '@/components/ItemModal'
 import ReorderRequestModal from '@/components/ReorderRequestModal'
 import CheckoutModal from '@/components/CheckoutModal'
@@ -15,6 +15,12 @@ export default function ItemDetail() {
   const { itemId } = useParams()
   const navigate = useNavigate()
   const { canEdit, user, isAdmin, isCoordinator } = useAuth()
+
+  // Admin comments state
+  const [adminComments, setAdminComments] = useState([])
+  const [showAdminComments, setShowAdminComments] = useState(false)
+  const [newCommentText, setNewCommentText] = useState('')
+  const [submittingComment, setSubmittingComment] = useState(false)
   const [item, setItem] = useState(null)
   const [logs, setLogs] = useState([])
   const [checkoutLogs, setCheckoutLogs] = useState([])
@@ -209,10 +215,112 @@ export default function ItemDetail() {
 
       setLogs(consolidateLogs(logsWithUsers))
       setCheckoutLogs(checkoutLogsWithUsers)
+
+      // Fetch admin comments (RLS will return empty for non-admins)
+      const { data: commentsData } = await supabase
+        .from('item_admin_comments')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: false })
+
+      setAdminComments(commentsData || [])
     } catch (error) {
       console.error('Error fetching item:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Admin comment functions
+  const handleAddComment = async () => {
+    if (!newCommentText.trim() || !isAdmin) return
+
+    setSubmittingComment(true)
+    try {
+      const userName = user.first_name && user.last_name
+        ? `${user.first_name} ${user.last_name}`
+        : user.email
+
+      const { error } = await supabase
+        .from('item_admin_comments')
+        .insert({
+          item_id: itemId,
+          user_id: user.id,
+          user_name: userName,
+          content: newCommentText.trim()
+        })
+
+      if (error) throw error
+
+      setNewCommentText('')
+      // Refresh comments
+      const { data: commentsData } = await supabase
+        .from('item_admin_comments')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: false })
+
+      setAdminComments(commentsData || [])
+    } catch (error) {
+      console.error('Error adding comment:', error)
+    } finally {
+      setSubmittingComment(false)
+    }
+  }
+
+  const handleResolveComment = async (commentId) => {
+    if (!isAdmin) return
+
+    try {
+      const userName = user.first_name && user.last_name
+        ? `${user.first_name} ${user.last_name}`
+        : user.email
+
+      const { error } = await supabase
+        .from('item_admin_comments')
+        .update({
+          resolved_at: new Date().toISOString(),
+          resolved_by: user.id,
+          resolved_by_name: userName
+        })
+        .eq('id', commentId)
+
+      if (error) throw error
+
+      // Refresh comments
+      const { data: commentsData } = await supabase
+        .from('item_admin_comments')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: false })
+
+      setAdminComments(commentsData || [])
+    } catch (error) {
+      console.error('Error resolving comment:', error)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!isAdmin || !confirm('Are you sure you want to delete this comment?')) return
+
+    try {
+      const { error } = await supabase
+        .from('item_admin_comments')
+        .delete()
+        .eq('id', commentId)
+
+      if (error) throw error
+
+      // Refresh comments
+      const { data: commentsData } = await supabase
+        .from('item_admin_comments')
+        .select('*')
+        .eq('item_id', itemId)
+        .order('created_at', { ascending: false })
+
+      setAdminComments(commentsData || [])
+    } catch (error) {
+      console.error('Error deleting comment:', error)
     }
   }
 
@@ -736,6 +844,122 @@ export default function ItemDetail() {
               </div>
             )}
           </div>
+
+          {/* Admin Comments Section - Only visible to admins */}
+          {isAdmin && (
+            <div className="bg-card border rounded-lg overflow-hidden border-purple-200 dark:border-purple-900">
+              <button
+                onClick={() => setShowAdminComments(!showAdminComments)}
+                className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+                  <h2 className="text-lg sm:text-xl font-semibold">Admin Comments</h2>
+                  <span className="text-xs sm:text-sm text-muted-foreground">({adminComments.length})</span>
+                  {adminComments.filter(c => !c.resolved_at).length > 0 && (
+                    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                      {adminComments.filter(c => !c.resolved_at).length} unresolved
+                    </span>
+                  )}
+                </div>
+                {showAdminComments ? (
+                  <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                )}
+              </button>
+
+              {showAdminComments && (
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                  {/* Add Comment Form */}
+                  <div className="mb-4 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
+                    <p className="text-xs font-medium text-purple-700 dark:text-purple-300 mb-2 flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" />
+                      Add Admin Comment
+                    </p>
+                    <textarea
+                      value={newCommentText}
+                      onChange={(e) => setNewCommentText(e.target.value)}
+                      placeholder="Enter your comment... (only visible to admins)"
+                      rows={2}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm resize-none"
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleAddComment}
+                        disabled={!newCommentText.trim() || submittingComment}
+                        className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      >
+                        {submittingComment ? 'Adding...' : 'Add Comment'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Comments List */}
+                  {adminComments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No admin comments yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {adminComments.map((comment) => (
+                        <div
+                          key={comment.id}
+                          className={`p-3 sm:p-4 rounded-md border ${
+                            comment.resolved_at
+                              ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
+                              : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {comment.resolved_at ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  <Check className="h-3 w-3" />
+                                  Resolved
+                                </span>
+                              ) : (
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                  Unresolved
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {comment.user_name} • {formatTimestamp(comment.created_at)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {!comment.resolved_at && (
+                                <button
+                                  onClick={() => handleResolveComment(comment.id)}
+                                  className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
+                                  title="Mark as resolved"
+                                >
+                                  <Check className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteComment(comment.id)}
+                                className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                title="Delete comment"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <p className={`text-sm ${comment.resolved_at ? 'text-muted-foreground' : ''}`}>
+                            {comment.content}
+                          </p>
+                          {comment.resolved_at && comment.resolved_by_name && (
+                            <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-green-200 dark:border-green-900">
+                              Resolved by {comment.resolved_by_name} • {formatTimestamp(comment.resolved_at)}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-3 sm:space-y-4">

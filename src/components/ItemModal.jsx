@@ -8,7 +8,7 @@ import { Upload, X, AlertTriangle } from 'lucide-react'
 import imageCompression from 'browser-image-compression'
 
 export default function ItemModal({ isOpen, onClose, onSuccess, item = null, locationId = null }) {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
@@ -215,7 +215,8 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
         image_url: imageUrl,
         quantity: unknownQuantity ? null : parseInt(formData.quantity),
         min_quantity: formData.min_quantity ? parseInt(formData.min_quantity) : null,
-        order_link: formData.order_link || null,
+        // Only admins can set/modify order_link; non-admins preserve existing value or null
+        order_link: isAdmin ? (formData.order_link || null) : (item?.order_link || null),
       }
 
       // Check if we're editing an item and the location has changed
@@ -448,19 +449,21 @@ export default function ItemModal({ isOpen, onClose, onSuccess, item = null, loc
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Order Link</label>
-            <input
-              type="url"
-              placeholder="https://..."
-              value={formData.order_link}
-              onChange={(e) => setFormData({ ...formData, order_link: e.target.value })}
-              className="w-full px-3 py-2 border rounded-md bg-background"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              URL for ordering this item (optional)
-            </p>
-          </div>
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Order Link</label>
+              <input
+                type="url"
+                placeholder="https://..."
+                value={formData.order_link}
+                onChange={(e) => setFormData({ ...formData, order_link: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md bg-background"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                URL for ordering this item (optional)
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Image</label>

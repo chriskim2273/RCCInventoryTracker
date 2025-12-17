@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatTimestamp, formatDate } from '@/lib/utils'
-import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell, ChevronDown, Check } from 'lucide-react'
+import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell, ChevronDown, Check, Lock, MessageSquare, ExternalLink } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
@@ -12,7 +12,7 @@ import RoleChangeConfirmationModal from '@/components/RoleChangeConfirmationModa
 import { useAuth } from '@/contexts/AuthContext'
 import { getUserDetails, deleteUser, resendConfirmationEmail, resetUserPassword } from '@/lib/adminApi'
 
-const VALID_TABS = ['users', 'categories', 'audit', 'admin-audit', 'deleted', 'checkout-history', 'settings']
+const VALID_TABS = ['users', 'categories', 'audit', 'admin-audit', 'deleted', 'checkout-history', 'admin-comments', 'settings']
 
 export default function AdminPanel() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -32,6 +32,12 @@ export default function AdminPanel() {
   const [deletedLocations, setDeletedLocations] = useState([])
   const [deletedCategories, setDeletedCategories] = useState([])
   const [checkoutHistory, setCheckoutHistory] = useState([])
+  const [adminComments, setAdminComments] = useState([])
+  const [adminCommentsItems, setAdminCommentsItems] = useState(new Map())
+  const [expandedCommentItems, setExpandedCommentItems] = useState(new Set())
+  const [adminCommentsSearchQuery, setAdminCommentsSearchQuery] = useState('')
+  const [adminCommentsStatusFilter, setAdminCommentsStatusFilter] = useState('all')
+  const [adminCommentsUserFilter, setAdminCommentsUserFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
@@ -403,6 +409,58 @@ export default function AdminPanel() {
     return Array.from(uniqueUsers.entries()).map(([id, user]) => ({ id, user }))
   }, [checkoutHistory])
 
+  // Admin comments filtered data
+  const filteredAdminCommentsItems = useMemo(() => {
+    let filtered = Array.from(adminCommentsItems.entries())
+
+    // Filter by search query (item name)
+    if (adminCommentsSearchQuery) {
+      const query = adminCommentsSearchQuery.toLowerCase()
+      filtered = filtered.filter(([itemId, data]) =>
+        data.item?.name?.toLowerCase().includes(query) ||
+        data.item?.serial_number?.toLowerCase().includes(query)
+      )
+    }
+
+    // Filter by status
+    if (adminCommentsStatusFilter !== 'all') {
+      filtered = filtered.filter(([itemId, data]) => {
+        if (adminCommentsStatusFilter === 'unresolved') {
+          return data.comments.some(c => !c.resolved_at)
+        } else if (adminCommentsStatusFilter === 'resolved') {
+          return data.comments.every(c => c.resolved_at)
+        }
+        return true
+      })
+    }
+
+    // Filter by user
+    if (adminCommentsUserFilter !== 'all') {
+      filtered = filtered.filter(([itemId, data]) =>
+        data.comments.some(c => c.user_id === adminCommentsUserFilter)
+      )
+    }
+
+    return filtered
+  }, [adminCommentsItems, adminCommentsSearchQuery, adminCommentsStatusFilter, adminCommentsUserFilter])
+
+  const adminCommentsUsers = useMemo(() => {
+    const uniqueUsers = new Map()
+    adminComments.forEach(comment => {
+      if (comment.user_id && comment.user_name) {
+        uniqueUsers.set(comment.user_id, { user_name: comment.user_name })
+      }
+    })
+    return Array.from(uniqueUsers.entries()).map(([id, data]) => ({ id, ...data }))
+  }, [adminComments])
+
+  const adminCommentsStats = useMemo(() => {
+    const total = adminComments.length
+    const unresolved = adminComments.filter(c => !c.resolved_at).length
+    const resolved = adminComments.filter(c => c.resolved_at).length
+    return { total, unresolved, resolved }
+  }, [adminComments])
+
   useEffect(() => {
     fetchData()
   }, [activeTab])
@@ -714,12 +772,116 @@ export default function AdminPanel() {
         }))
 
         setCheckoutHistory(logsWithJoins)
+      } else if (activeTab === 'admin-comments') {
+        // Fetch all admin comments with item and location info
+        const [commentsResult, itemsResult, locationsResult, usersResult] = await Promise.all([
+          supabase
+            .from('item_admin_comments')
+            .select('*')
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('items')
+            .select('id, name, serial_number, location_id')
+            .is('deleted_at', null),
+          supabase
+            .from('locations')
+            .select('id, name, path'),
+          supabase
+            .from('users')
+            .select('id, email, first_name, last_name')
+        ])
+
+        // Create maps for lookups
+        const itemsMap = new Map((itemsResult.data || []).map(item => [item.id, item]))
+        const locationsMap = new Map((locationsResult.data || []).map(loc => [loc.id, loc]))
+        const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
+
+        // Enrich comments with item and location data
+        const enrichedComments = (commentsResult.data || []).map(comment => {
+          const item = itemsMap.get(comment.item_id)
+          return {
+            ...comment,
+            item: item ? {
+              ...item,
+              location: item.location_id ? locationsMap.get(item.location_id) : null
+            } : null
+          }
+        })
+
+        // Create a map of item_id -> comments for grouped display
+        const itemCommentsMap = new Map()
+        enrichedComments.forEach(comment => {
+          if (comment.item_id) {
+            if (!itemCommentsMap.has(comment.item_id)) {
+              itemCommentsMap.set(comment.item_id, {
+                item: comment.item,
+                comments: []
+              })
+            }
+            itemCommentsMap.get(comment.item_id).comments.push(comment)
+          }
+        })
+
+        setAdminComments(enrichedComments)
+        setAdminCommentsItems(itemCommentsMap)
+        setUsers(usersResult.data || [])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Admin comment functions for AdminPanel
+  const handleResolveAdminComment = async (commentId) => {
+    try {
+      const userName = currentUser.first_name && currentUser.last_name
+        ? `${currentUser.first_name} ${currentUser.last_name}`
+        : currentUser.email
+
+      const { error } = await supabase
+        .from('item_admin_comments')
+        .update({
+          resolved_at: new Date().toISOString(),
+          resolved_by: currentUser.id,
+          resolved_by_name: userName
+        })
+        .eq('id', commentId)
+
+      if (error) throw error
+      fetchData()
+    } catch (error) {
+      console.error('Error resolving comment:', error)
+    }
+  }
+
+  const handleDeleteAdminComment = async (commentId) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return
+
+    try {
+      const { error } = await supabase
+        .from('item_admin_comments')
+        .delete()
+        .eq('id', commentId)
+
+      if (error) throw error
+      fetchData()
+    } catch (error) {
+      console.error('Error deleting comment:', error)
+    }
+  }
+
+  const toggleCommentItemExpansion = (itemId) => {
+    setExpandedCommentItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return newSet
+    })
   }
 
   const prepareRoleChange = (user, newRole) => {
@@ -1317,6 +1479,23 @@ export default function AdminPanel() {
             <ClipboardList className="h-4 w-4" />
             <span className="hidden sm:inline">Checkout History</span>
             <span className="sm:hidden">Checkouts</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('admin-comments')}
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 border-b-2 transition-colors text-sm sm:text-base whitespace-nowrap ${activeTab === 'admin-comments'
+              ? 'border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
+              : 'border-transparent text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400'
+              }`}
+          >
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Admin Comments</span>
+            <span className="sm:hidden">Comments</span>
+            {adminCommentsStats.unresolved > 0 && (
+              <span className="inline-flex px-1.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                {adminCommentsStats.unresolved}
+              </span>
+            )}
           </button>
 
           <button
@@ -2785,6 +2964,210 @@ export default function AdminPanel() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'admin-comments' && (
+            <div className="space-y-4">
+              {/* Statistics */}
+              <div className="bg-card border rounded-lg p-4 border-purple-200 dark:border-purple-900">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30">
+                      <MessageSquare className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-semibold">{adminCommentsStats.total}</p>
+                      <p className="text-xs text-muted-foreground">Total Comments</p>
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:block w-px h-10 bg-border" />
+
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                      <span className="text-sm font-medium">{adminCommentsStats.unresolved}</span>
+                      <span className="text-xs text-muted-foreground">unresolved</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium">{adminCommentsStats.resolved}</span>
+                      <span className="text-xs text-muted-foreground">resolved</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by item name..."
+                    value={adminCommentsSearchQuery}
+                    onChange={(e) => setAdminCommentsSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-8 py-2 border rounded-md bg-background text-sm"
+                  />
+                  {adminCommentsSearchQuery && (
+                    <button
+                      onClick={() => setAdminCommentsSearchQuery('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={adminCommentsStatusFilter}
+                  onChange={(e) => setAdminCommentsStatusFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="unresolved">Unresolved</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+                <select
+                  value={adminCommentsUserFilter}
+                  onChange={(e) => setAdminCommentsUserFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-md bg-background text-sm"
+                >
+                  <option value="all">All Users</option>
+                  {adminCommentsUsers.map(({ id, user_name }) => (
+                    <option key={id} value={id}>
+                      {user_name}
+                    </option>
+                  ))}
+                </select>
+                {(adminCommentsSearchQuery || adminCommentsStatusFilter !== 'all' || adminCommentsUserFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setAdminCommentsSearchQuery('')
+                      setAdminCommentsStatusFilter('all')
+                      setAdminCommentsUserFilter('all')
+                    }}
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              </div>
+
+              {/* Comments grouped by item */}
+              {filteredAdminCommentsItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
+                  {adminComments.length === 0 ? 'No admin comments yet' : 'No comments match your filters'}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredAdminCommentsItems.map(([itemId, data]) => {
+                    const unresolvedCount = data.comments.filter(c => !c.resolved_at).length
+                    const isExpanded = expandedCommentItems.has(itemId)
+
+                    return (
+                      <div key={itemId} className="bg-card border rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => toggleCommentItemExpansion(itemId)}
+                          className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium truncate">
+                                  {data.item?.name || 'Unknown Item'}
+                                </span>
+                                {unresolvedCount > 0 && (
+                                  <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                    {unresolvedCount} unresolved
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {data.item?.location?.path || data.item?.location?.name || 'Unknown Location'}
+                                <span className="mx-2">•</span>
+                                {data.comments.length} comment{data.comments.length !== 1 ? 's' : ''}
+                              </div>
+                            </div>
+                            <Link
+                              to={`/items/${itemId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              View Item
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronDown className="h-5 w-5 text-muted-foreground ml-2 flex-shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-muted-foreground ml-2 flex-shrink-0 -rotate-90" />
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="px-4 pb-4 space-y-3 border-t">
+                            {data.comments.map((comment) => (
+                              <div
+                                key={comment.id}
+                                className={`p-3 rounded-md border mt-3 ${
+                                  comment.resolved_at
+                                    ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
+                                    : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {comment.resolved_at ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                        <Check className="h-3 w-3" />
+                                        Resolved
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                        Unresolved
+                                      </span>
+                                    )}
+                                    <span className="text-xs text-muted-foreground">
+                                      {comment.user_name} • {formatTimestamp(comment.created_at)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {!comment.resolved_at && (
+                                      <button
+                                        onClick={() => handleResolveAdminComment(comment.id)}
+                                        className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
+                                        title="Mark as resolved"
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => handleDeleteAdminComment(comment.id)}
+                                      className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                      title="Delete comment"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className={`text-sm ${comment.resolved_at ? 'text-muted-foreground' : ''}`}>
+                                  {comment.content}
+                                </p>
+                                {comment.resolved_at && comment.resolved_by_name && (
+                                  <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-green-200 dark:border-green-900">
+                                    Resolved by {comment.resolved_by_name} • {formatTimestamp(comment.resolved_at)}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
