@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { formatTimestamp, formatDate } from '@/lib/utils'
 import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell, ChevronDown, Check } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
 import ItemModal from '@/components/ItemModal'
@@ -11,8 +12,16 @@ import RoleChangeConfirmationModal from '@/components/RoleChangeConfirmationModa
 import { useAuth } from '@/contexts/AuthContext'
 import { getUserDetails, deleteUser, resendConfirmationEmail, resetUserPassword } from '@/lib/adminApi'
 
+const VALID_TABS = ['users', 'categories', 'audit', 'admin-audit', 'deleted', 'checkout-history', 'settings']
+
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState('users')
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Initialize state from URL params
+  const initialTab = VALID_TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'users'
+  const initialPage = parseInt(searchParams.get('page'), 10) || 1
+
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [users, setUsers] = useState([])
   const [items, setItems] = useState([])
   const [locations, setLocations] = useState([])
@@ -78,9 +87,19 @@ export default function AdminPanel() {
   const [auditSearchQuery, setAuditSearchQuery] = useState('')
   const [auditActionFilter, setAuditActionFilter] = useState('all')
   const [auditUserFilter, setAuditUserFilter] = useState('all')
+  const [auditStartDate, setAuditStartDate] = useState('')
+  const [auditEndDate, setAuditEndDate] = useState('')
+  const [auditPage, setAuditPage] = useState(initialTab === 'audit' ? initialPage : 1)
+  const [auditTotalCount, setAuditTotalCount] = useState(0)
+  const AUDIT_PAGE_SIZE = 50
 
   const [adminAuditActionFilter, setAdminAuditActionFilter] = useState('all')
   const [adminAuditUserFilter, setAdminAuditUserFilter] = useState('all')
+  const [adminAuditStartDate, setAdminAuditStartDate] = useState('')
+  const [adminAuditEndDate, setAdminAuditEndDate] = useState('')
+  const [adminAuditPage, setAdminAuditPage] = useState(initialTab === 'admin-audit' ? initialPage : 1)
+  const [adminAuditTotalCount, setAdminAuditTotalCount] = useState(0)
+  const ADMIN_AUDIT_PAGE_SIZE = 50
 
   const [deletedSearchQuery, setDeletedSearchQuery] = useState('')
   const [deletedTypeFilter, setDeletedTypeFilter] = useState('all')
@@ -93,6 +112,36 @@ export default function AdminPanel() {
   const [userSearchQuery, setUserSearchQuery] = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('all')
   const [userStatusFilter, setUserStatusFilter] = useState('all')
+
+  // Refs to track initial mount and previous filter values
+  const isInitialMount = useRef(true)
+  const prevAuditDates = useRef({ start: auditStartDate, end: auditEndDate })
+  const prevAdminAuditDates = useRef({ start: adminAuditStartDate, end: adminAuditEndDate })
+
+  // Sync URL with tab and page state (skip initial mount to preserve URL params)
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+
+    const params = new URLSearchParams()
+
+    // Always set tab if not 'users' (default)
+    if (activeTab !== 'users') {
+      params.set('tab', activeTab)
+    }
+
+    // Only set page if on a paginated tab and page > 1
+    if (activeTab === 'audit' && auditPage > 1) {
+      params.set('page', String(auditPage))
+    } else if (activeTab === 'admin-audit' && adminAuditPage > 1) {
+      params.set('page', String(adminAuditPage))
+    }
+
+    // Update URL without adding to history for page changes
+    setSearchParams(params, { replace: true })
+  }, [activeTab, auditPage, adminAuditPage, setSearchParams])
 
   const formatFieldName = (key) => {
     const fieldNames = {
@@ -358,6 +407,48 @@ export default function AdminPanel() {
     fetchData()
   }, [activeTab])
 
+  // Refetch audit logs when date filters or page changes
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchData()
+    }
+  }, [auditStartDate, auditEndDate, auditPage])
+
+  // Reset to page 1 when date filters actually change (not on initial mount)
+  useEffect(() => {
+    const prevStart = prevAuditDates.current.start
+    const prevEnd = prevAuditDates.current.end
+
+    // Update refs
+    prevAuditDates.current = { start: auditStartDate, end: auditEndDate }
+
+    // Only reset page if values actually changed (not on initial mount)
+    if (prevStart !== auditStartDate || prevEnd !== auditEndDate) {
+      setAuditPage(1)
+    }
+  }, [auditStartDate, auditEndDate])
+
+  // Refetch admin audit logs when date filters or page changes
+  useEffect(() => {
+    if (activeTab === 'admin-audit') {
+      fetchData()
+    }
+  }, [adminAuditStartDate, adminAuditEndDate, adminAuditPage])
+
+  // Reset admin audit to page 1 when date filters actually change (not on initial mount)
+  useEffect(() => {
+    const prevStart = prevAdminAuditDates.current.start
+    const prevEnd = prevAdminAuditDates.current.end
+
+    // Update refs
+    prevAdminAuditDates.current = { start: adminAuditStartDate, end: adminAuditEndDate }
+
+    // Only reset page if values actually changed (not on initial mount)
+    if (prevStart !== adminAuditStartDate || prevEnd !== adminAuditEndDate) {
+      setAdminAuditPage(1)
+    }
+  }, [adminAuditStartDate, adminAuditEndDate])
+
   // Fetch current user's notification preferences on mount
   useEffect(() => {
     const fetchNotificationPreferences = async () => {
@@ -449,13 +540,30 @@ export default function AdminPanel() {
         const { data } = await supabase.from('categories').select('*').is('deleted_at', null).order('name')
         setCategories(data || [])
       } else if (activeTab === 'audit') {
+        // Calculate pagination range
+        const from = (auditPage - 1) * AUDIT_PAGE_SIZE
+        const to = from + AUDIT_PAGE_SIZE - 1
+
+        // Build the query with filters
+        let logsQuery = supabase
+          .from('item_logs')
+          .select('*', { count: 'exact' })
+          .order('timestamp', { ascending: false })
+
+        // Apply date filters if set
+        if (auditStartDate) {
+          logsQuery = logsQuery.gte('timestamp', `${auditStartDate}T00:00:00`)
+        }
+        if (auditEndDate) {
+          logsQuery = logsQuery.lte('timestamp', `${auditEndDate}T23:59:59`)
+        }
+
+        // Apply pagination
+        logsQuery = logsQuery.range(from, to)
+
         // Fetch item logs, items, users, locations, and categories
         const [logsResult, itemsResult, usersResult, locationsResult, categoriesResult] = await Promise.all([
-          supabase
-            .from('item_logs')
-            .select('*')
-            .order('timestamp', { ascending: false })
-            .limit(100),
+          logsQuery,
           supabase
             .from('items')
             .select('id, name'),
@@ -470,6 +578,9 @@ export default function AdminPanel() {
             .from('categories')
             .select('id, name')
         ])
+
+        // Store total count for pagination
+        setAuditTotalCount(logsResult.count || 0)
 
         // Manually join items and users to logs
         const itemsMap = new Map((itemsResult.data || []).map(item => [item.id, item]))
@@ -486,17 +597,37 @@ export default function AdminPanel() {
         setCategories(categoriesResult.data || [])
         setAuditLogs(logsWithJoins)
       } else if (activeTab === 'admin-audit') {
+        // Calculate pagination range
+        const from = (adminAuditPage - 1) * ADMIN_AUDIT_PAGE_SIZE
+        const to = from + ADMIN_AUDIT_PAGE_SIZE - 1
+
+        // Build the query with filters
+        let logsQuery = supabase
+          .from('audit_logs')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+
+        // Apply date filters if set
+        if (adminAuditStartDate) {
+          logsQuery = logsQuery.gte('created_at', `${adminAuditStartDate}T00:00:00`)
+        }
+        if (adminAuditEndDate) {
+          logsQuery = logsQuery.lte('created_at', `${adminAuditEndDate}T23:59:59`)
+        }
+
+        // Apply pagination
+        logsQuery = logsQuery.range(from, to)
+
         // Fetch audit logs and users separately since we removed the FK constraint
         const [logsResult, usersResult] = await Promise.all([
-          supabase
-            .from('audit_logs')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(100),
+          logsQuery,
           supabase
             .from('users')
             .select('id, email, first_name, last_name')
         ])
+
+        // Store total count for pagination
+        setAdminAuditTotalCount(logsResult.count || 0)
 
         // Manually join users to logs
         const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
@@ -1390,9 +1521,7 @@ export default function AdminPanel() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
-                            {user.last_sign_in_at
-                              ? new Date(user.last_sign_in_at).toLocaleDateString()
-                              : 'Never'}
+                            {formatDate(user.last_sign_in_at)}
                           </td>
                           <td className="px-4 py-3">
                             {canManageUsers ? (
@@ -1512,33 +1641,59 @@ export default function AdminPanel() {
             <div className="space-y-4">
               {/* Filters */}
               <div className="bg-card border rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Search</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search item name..."
+                        value={auditSearchQuery}
+                        onChange={(e) => setAuditSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-8 py-2 border rounded-md bg-background text-sm"
+                      />
+                      {auditSearchQuery && (
+                        <button
+                          onClick={() => setAuditSearchQuery('')}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Start Date */}
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">From Date</label>
                     <input
-                      type="text"
-                      placeholder="Search item name..."
-                      value={auditSearchQuery}
-                      onChange={(e) => setAuditSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-8 py-2 border rounded-md bg-background"
+                      type="date"
+                      value={auditStartDate}
+                      onChange={(e) => setAuditStartDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     />
-                    {auditSearchQuery && (
-                      <button
-                        onClick={() => setAuditSearchQuery('')}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
+                  </div>
+
+                  {/* End Date */}
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">To Date</label>
+                    <input
+                      type="date"
+                      value={auditEndDate}
+                      onChange={(e) => setAuditEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    />
                   </div>
 
                   {/* Action Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Action</label>
                     <select
                       value={auditActionFilter}
                       onChange={(e) => setAuditActionFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Actions</option>
                       <option value="create">Create</option>
@@ -1551,10 +1706,11 @@ export default function AdminPanel() {
 
                   {/* User Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">User</label>
                     <select
                       value={auditUserFilter}
                       onChange={(e) => setAuditUserFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Users</option>
                       {auditUsers.map(({ id, user }) => (
@@ -1567,13 +1723,29 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Active Filters Display */}
-                {(auditSearchQuery || auditActionFilter !== 'all' || auditUserFilter !== 'all') && (
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                {(auditSearchQuery || auditStartDate || auditEndDate || auditActionFilter !== 'all' || auditUserFilter !== 'all') && (
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
                     <span className="text-sm text-muted-foreground">Active filters:</span>
                     {auditSearchQuery && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
                         Search: "{auditSearchQuery}"
                         <button onClick={() => setAuditSearchQuery('')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    {auditStartDate && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        From: {auditStartDate}
+                        <button onClick={() => setAuditStartDate('')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    {auditEndDate && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        To: {auditEndDate}
+                        <button onClick={() => setAuditEndDate('')} className="hover:text-primary/80">
                           <X className="h-3 w-3" />
                         </button>
                       </span>
@@ -1597,6 +1769,8 @@ export default function AdminPanel() {
                     <button
                       onClick={() => {
                         setAuditSearchQuery('')
+                        setAuditStartDate('')
+                        setAuditEndDate('')
                         setAuditActionFilter('all')
                         setAuditUserFilter('all')
                       }}
@@ -1608,10 +1782,48 @@ export default function AdminPanel() {
                 )}
               </div>
 
+              {/* Pagination Info & Controls */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {auditTotalCount === 0 ? (
+                    'No logs found'
+                  ) : (
+                    <>
+                      Showing {Math.min((auditPage - 1) * AUDIT_PAGE_SIZE + 1, auditTotalCount)}-{Math.min(auditPage * AUDIT_PAGE_SIZE, auditTotalCount)} of {auditTotalCount} logs
+                      {auditTotalCount > AUDIT_PAGE_SIZE && (
+                        <span className="ml-1">(Page {auditPage} of {Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)})</span>
+                      )}
+                    </>
+                  )}
+                </p>
+
+                {auditTotalCount > AUDIT_PAGE_SIZE && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAuditPage(p => Math.max(1, p - 1))}
+                      disabled={auditPage === 1}
+                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      {auditPage} / {Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)}
+                    </span>
+                    <button
+                      onClick={() => setAuditPage(p => p + 1)}
+                      disabled={auditPage >= Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)}
+                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Results */}
               {filteredAuditLogs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
-                  {auditLogs.length === 0 ? 'No audit logs yet' : 'No logs match your filters'}
+                  {auditTotalCount === 0 ? 'No audit logs found for the selected date range' : 'No logs match your filters'}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1643,7 +1855,7 @@ export default function AdminPanel() {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {new Date(log.timestamp).toLocaleString()} • {getUserDisplayName(log.user, log.user_name)}
+                            {formatTimestamp(log.timestamp)} • {getUserDisplayName(log.user, log.user_name)}
                           </p>
                         </div>
                       </div>
@@ -1659,7 +1871,19 @@ export default function AdminPanel() {
                                   return (
                                     <div key={key} className="flex items-start gap-2">
                                       <span className="text-muted-foreground min-w-32">{formatFieldName(key)}:</span>
-                                      <span className="font-medium flex-1">{formatValue(value, key)}</span>
+                                      {key === 'image_url' && value ? (
+                                        <img
+                                          src={value}
+                                          alt="Item image"
+                                          className="h-16 w-16 object-cover rounded border"
+                                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'inline'; }}
+                                        />
+                                      ) : (
+                                        <span className="font-medium flex-1 break-all">{formatValue(value, key)}</span>
+                                      )}
+                                      {key === 'image_url' && value && (
+                                        <span className="font-medium flex-1 break-all" style={{ display: 'none' }}>{formatValue(value, key)}</span>
+                                      )}
                                     </div>
                                   )
                                 })}
@@ -1678,14 +1902,47 @@ export default function AdminPanel() {
                                   return (
                                     <div key={key} className="flex items-start gap-2 bg-muted/30 rounded-lg p-3">
                                       <span className="text-muted-foreground min-w-32 font-medium">{formatFieldName(key)}:</span>
-                                      <div className="flex-1 flex items-center gap-2">
-                                        <span className="line-through text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded">
-                                          {formatValue(oldValue, key)}
-                                        </span>
-                                        <span className="text-muted-foreground">→</span>
-                                        <span className="text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded">
-                                          {formatValue(newValue, key)}
-                                        </span>
+                                      <div className="flex-1 flex flex-wrap items-center gap-2">
+                                        {key === 'image_url' ? (
+                                          <>
+                                            {oldValue ? (
+                                              <div className="relative">
+                                                <img
+                                                  src={oldValue}
+                                                  alt="Old image"
+                                                  className="h-16 w-16 object-cover rounded border border-red-300 opacity-60"
+                                                  onError={(e) => { e.target.parentElement.innerHTML = '<span class="text-red-600 text-sm">Image unavailable</span>'; }}
+                                                />
+                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                  <div className="w-full h-0.5 bg-red-500 rotate-45"></div>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <span className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded">None</span>
+                                            )}
+                                            <span className="text-muted-foreground">→</span>
+                                            {newValue ? (
+                                              <img
+                                                src={newValue}
+                                                alt="New image"
+                                                className="h-16 w-16 object-cover rounded border border-green-300"
+                                                onError={(e) => { e.target.outerHTML = '<span class="text-green-600 text-sm">Image unavailable</span>'; }}
+                                              />
+                                            ) : (
+                                              <span className="text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded">None</span>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="line-through text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded break-all">
+                                              {formatValue(oldValue, key)}
+                                            </span>
+                                            <span className="text-muted-foreground">→</span>
+                                            <span className="text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded break-all">
+                                              {formatValue(newValue, key)}
+                                            </span>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   )
@@ -1702,7 +1959,16 @@ export default function AdminPanel() {
                                   return (
                                     <div key={key} className="flex items-start gap-2">
                                       <span className="text-muted-foreground min-w-32">{key}:</span>
-                                      <span className="font-medium flex-1">{formatValue(value)}</span>
+                                      {key === 'image_url' && value ? (
+                                        <img
+                                          src={value}
+                                          alt="Deleted item image"
+                                          className="h-16 w-16 object-cover rounded border opacity-60"
+                                          onError={(e) => { e.target.outerHTML = '<span class="font-medium">Image unavailable</span>'; }}
+                                        />
+                                      ) : (
+                                        <span className="font-medium flex-1 break-all">{formatValue(value)}</span>
+                                      )}
                                     </div>
                                   )
                                 })}
@@ -1722,13 +1988,36 @@ export default function AdminPanel() {
             <div className="space-y-4">
               {/* Filters */}
               <div className="bg-card border rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Start Date */}
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">From Date</label>
+                    <input
+                      type="date"
+                      value={adminAuditStartDate}
+                      onChange={(e) => setAdminAuditStartDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    />
+                  </div>
+
+                  {/* End Date */}
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">To Date</label>
+                    <input
+                      type="date"
+                      value={adminAuditEndDate}
+                      onChange={(e) => setAdminAuditEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    />
+                  </div>
+
                   {/* Action Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Action</label>
                     <select
                       value={adminAuditActionFilter}
                       onChange={(e) => setAdminAuditActionFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Actions</option>
                       <option value="delete_user">Delete User</option>
@@ -1746,12 +2035,13 @@ export default function AdminPanel() {
 
                   {/* User Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Admin</label>
                     <select
                       value={adminAuditUserFilter}
                       onChange={(e) => setAdminAuditUserFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
-                      <option value="all">All Users</option>
+                      <option value="all">All Admins</option>
                       {adminAuditUsers.map(({ id, user }) => (
                         <option key={id} value={id}>
                           {getUserDisplayName(user)}
@@ -1762,9 +2052,25 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Active Filters Display */}
-                {(adminAuditActionFilter !== 'all' || adminAuditUserFilter !== 'all') && (
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                {(adminAuditStartDate || adminAuditEndDate || adminAuditActionFilter !== 'all' || adminAuditUserFilter !== 'all') && (
+                  <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
                     <span className="text-sm text-muted-foreground">Active filters:</span>
+                    {adminAuditStartDate && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        From: {adminAuditStartDate}
+                        <button onClick={() => setAdminAuditStartDate('')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
+                    {adminAuditEndDate && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
+                        To: {adminAuditEndDate}
+                        <button onClick={() => setAdminAuditEndDate('')} className="hover:text-primary/80">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    )}
                     {adminAuditActionFilter !== 'all' && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary text-xs rounded-md">
                         Action: {adminAuditActionFilter.replace('_', ' ')}
@@ -1783,6 +2089,8 @@ export default function AdminPanel() {
                     )}
                     <button
                       onClick={() => {
+                        setAdminAuditStartDate('')
+                        setAdminAuditEndDate('')
                         setAdminAuditActionFilter('all')
                         setAdminAuditUserFilter('all')
                       }}
@@ -1794,10 +2102,48 @@ export default function AdminPanel() {
                 )}
               </div>
 
+              {/* Pagination Info & Controls */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {adminAuditTotalCount === 0 ? (
+                    'No logs found'
+                  ) : (
+                    <>
+                      Showing {Math.min((adminAuditPage - 1) * ADMIN_AUDIT_PAGE_SIZE + 1, adminAuditTotalCount)}-{Math.min(adminAuditPage * ADMIN_AUDIT_PAGE_SIZE, adminAuditTotalCount)} of {adminAuditTotalCount} logs
+                      {adminAuditTotalCount > ADMIN_AUDIT_PAGE_SIZE && (
+                        <span className="ml-1">(Page {adminAuditPage} of {Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)})</span>
+                      )}
+                    </>
+                  )}
+                </p>
+
+                {adminAuditTotalCount > ADMIN_AUDIT_PAGE_SIZE && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAdminAuditPage(p => Math.max(1, p - 1))}
+                      disabled={adminAuditPage === 1}
+                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      {adminAuditPage} / {Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)}
+                    </span>
+                    <button
+                      onClick={() => setAdminAuditPage(p => p + 1)}
+                      disabled={adminAuditPage >= Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)}
+                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Results */}
               {filteredAdminAuditLogs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
-                  {adminAuditLogs.length === 0 ? 'No administrative actions logged yet' : 'No logs match your filters'}
+                  {adminAuditTotalCount === 0 ? 'No administrative actions found for the selected date range' : 'No logs match your filters'}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1824,7 +2170,7 @@ export default function AdminPanel() {
                               {!['delete_location', 'restore_location', 'hard_delete_location', 'restore_item', 'hard_delete_item', 'restore_category', 'hard_delete_category', 'bulk_delete', 'delete_user', 'resend_confirmation', 'new_user_notification_sent'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              {new Date(log.created_at).toLocaleString()}
+                              {formatTimestamp(log.created_at)}
                             </p>
                             <p className="text-sm font-medium mt-1">
                               Admin: {getUserDisplayName(log.user, log.user_name)}
@@ -1931,31 +2277,35 @@ export default function AdminPanel() {
               <div className="bg-card border rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search name..."
-                      value={deletedSearchQuery}
-                      onChange={(e) => setDeletedSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-8 py-2 border rounded-md bg-background"
-                    />
-                    {deletedSearchQuery && (
-                      <button
-                        onClick={() => setDeletedSearchQuery('')}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Search</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search name..."
+                        value={deletedSearchQuery}
+                        onChange={(e) => setDeletedSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-8 py-2 border rounded-md bg-background text-sm"
+                      />
+                      {deletedSearchQuery && (
+                        <button
+                          onClick={() => setDeletedSearchQuery('')}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Type Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Type</label>
                     <select
                       value={deletedTypeFilter}
                       onChange={(e) => setDeletedTypeFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Types</option>
                       <option value="items">Items ({deletedItems.length})</option>
@@ -1966,10 +2316,11 @@ export default function AdminPanel() {
 
                   {/* User Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Deleted By</label>
                     <select
                       value={deletedUserFilter}
                       onChange={(e) => setDeletedUserFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Users</option>
                       {deletedByUsers.map(({ id, user }) => (
@@ -2067,7 +2418,7 @@ export default function AdminPanel() {
                                 ) : 'N/A'}
                               </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {new Date(item.deleted_at).toLocaleString()}
+                                {formatTimestamp(item.deleted_at)}
                               </td>
                               <td className="px-4 py-3 text-sm">{getUserDisplayName(item.deleted_by_user, item.deleted_by_name)}</td>
                               <td className="px-4 py-3">
@@ -2127,7 +2478,7 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {new Date(location.deleted_at).toLocaleString()}
+                                {formatTimestamp(location.deleted_at)}
                               </td>
                               <td className="px-4 py-3 text-sm">{getUserDisplayName(location.deleted_by_user, location.deleted_by_name)}</td>
                               <td className="px-4 py-3">
@@ -2183,7 +2534,7 @@ export default function AdminPanel() {
                               <td className="px-4 py-3 font-medium">{category.name}</td>
                               <td className="px-4 py-3 text-xl">{category.icon}</td>
                               <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {new Date(category.deleted_at).toLocaleString()}
+                                {formatTimestamp(category.deleted_at)}
                               </td>
                               <td className="px-4 py-3 text-sm">{getUserDisplayName(category.deleted_by_user, category.deleted_by_name)}</td>
                               <td className="px-4 py-3">
@@ -2221,31 +2572,35 @@ export default function AdminPanel() {
               <div className="bg-card border rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                      type="text"
-                      placeholder="Search item or person..."
-                      value={checkoutSearchQuery}
-                      onChange={(e) => setCheckoutSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-8 py-2 border rounded-md bg-background"
-                    />
-                    {checkoutSearchQuery && (
-                      <button
-                        onClick={() => setCheckoutSearchQuery('')}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Search</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Search item or person..."
+                        value={checkoutSearchQuery}
+                        onChange={(e) => setCheckoutSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-8 py-2 border rounded-md bg-background text-sm"
+                      />
+                      {checkoutSearchQuery && (
+                        <button
+                          onClick={() => setCheckoutSearchQuery('')}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Status Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Status</label>
                     <select
                       value={checkoutStatusFilter}
                       onChange={(e) => setCheckoutStatusFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Status</option>
                       <option value="active">Active (Checked Out)</option>
@@ -2255,10 +2610,11 @@ export default function AdminPanel() {
 
                   {/* Performed By Filter */}
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Performed By</label>
                     <select
                       value={checkoutPerformedByFilter}
                       onChange={(e) => setCheckoutPerformedByFilter(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md bg-background"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
                     >
                       <option value="all">All Staff</option>
                       {checkoutPerformedByUsers.map(({ id, user }) => (
@@ -2382,11 +2738,11 @@ export default function AdminPanel() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-sm">
-                                {new Date(log.checked_out_at).toLocaleString()}
+                                {formatTimestamp(log.checked_out_at)}
                               </td>
                               <td className="px-4 py-3 text-sm">
                                 {log.checked_in_at ? (
-                                  new Date(log.checked_in_at).toLocaleString()
+                                  formatTimestamp(log.checked_in_at)
                                 ) : (
                                   <span className="text-muted-foreground">-</span>
                                 )}

@@ -73,14 +73,36 @@ def create_table_from_data(table_name, sample_record, cursor):
     create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)})"
     cursor.execute(create_sql)
 
+def fetch_all_records(table_name, page_size=1000):
+    """Fetch ALL records from a Supabase table using pagination to bypass default limits"""
+    all_records = []
+    offset = 0
+
+    while True:
+        # Use range() to paginate through all records
+        response = supabase.table(table_name).select('*').range(offset, offset + page_size - 1).execute()
+        records = response.data
+
+        if not records:
+            break
+
+        all_records.extend(records)
+
+        # If we got fewer records than page_size, we've reached the end
+        if len(records) < page_size:
+            break
+
+        offset += page_size
+
+    return all_records
+
 def backup_table(table_name, cursor):
     """Fetch all data from a Supabase table and insert into SQLite"""
     print(f"Backing up {table_name}...", end=' ')
 
     try:
-        # Fetch all records from Supabase
-        response = supabase.table(table_name).select('*').execute()
-        records = response.data
+        # Fetch ALL records from Supabase using pagination
+        records = fetch_all_records(table_name)
 
         if not records:
             print(f"(empty)")

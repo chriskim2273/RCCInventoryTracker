@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { formatTimestamp, formatDate } from '@/lib/utils'
 import { ArrowLeft, Edit, Trash2, Plus, Minus, UserCheck, UserX, ChevronDown, ChevronRight, History, RefreshCw } from 'lucide-react'
 import ItemModal from '@/components/ItemModal'
 import ReorderRequestModal from '@/components/ReorderRequestModal'
@@ -549,12 +550,12 @@ export default function ItemDetail() {
                         <div className="text-xs text-muted-foreground space-y-0.5 mb-3">
                           <p>
                             <span className="font-medium">Checked Out:</span>{' '}
-                            {new Date(log.checked_out_at).toLocaleString()}
+                            {formatTimestamp(log.checked_out_at)}
                           </p>
                           {log.checked_in_at && (
                             <p>
                               <span className="font-medium">Checked In:</span>{' '}
-                              {new Date(log.checked_in_at).toLocaleString()}
+                              {formatTimestamp(log.checked_in_at)}
                             </p>
                           )}
                           <p>
@@ -629,7 +630,7 @@ export default function ItemDetail() {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {new Date(log.timestamp).toLocaleString()}
+                            {formatTimestamp(log.timestamp)}
                           </p>
                         </div>
                         <p className="text-sm mb-2">
@@ -697,7 +698,7 @@ export default function ItemDetail() {
                                       {log.individualLogs.map((individualLog, idx) => (
                                         <div key={individualLog.id} className="ml-2 p-2 bg-background rounded border text-xs">
                                           <p className="text-muted-foreground mb-1">
-                                            {new Date(individualLog.timestamp).toLocaleString()}
+                                            {formatTimestamp(individualLog.timestamp)}
                                           </p>
                                           {individualLog.changes?.old && individualLog.changes?.new && (
                                             <div className="space-y-0.5">
@@ -842,7 +843,7 @@ export default function ItemDetail() {
                               {checkout.checked_out_to || `Reservation: ${checkout.reservation_id}`}
                             </p>
                             <p className="text-muted-foreground">
-                              {outQty} unit{outQty > 1 ? 's' : ''} • {new Date(checkout.checked_out_at).toLocaleDateString()}
+                              {outQty} unit{outQty > 1 ? 's' : ''} • {formatDate(checkout.checked_out_at)}
                             </p>
                           </div>
                         )

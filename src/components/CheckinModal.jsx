@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { formatTimestamp } from '@/lib/utils'
 import Modal from './Modal'
 
 export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
@@ -176,7 +177,7 @@ export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium">{checkout.checked_out_to}</p>
                         <p className="text-xs text-muted-foreground">
-                          Checked out: {new Date(checkout.checked_out_at).toLocaleString()}
+                          Checked out: {formatTimestamp(checkout.checked_out_at)}
                         </p>
                         {checkout.checkout_notes && (
                           <p className="text-xs text-muted-foreground mt-1">
