@@ -11,7 +11,7 @@ import SearchBar from '@/components/SearchBar'
 import { aiSearch } from '@/lib/aiSearch'
 
 // Memoized Mobile Item Card Component
-const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
+const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect, currentSearchParams }) => {
   return (
     <div className="bg-card border rounded-lg p-4">
       <div className="flex gap-3 mb-3">
@@ -39,6 +39,7 @@ const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
           <div className="flex-1 min-w-0">
             <Link
               to={`/items/${item.id}`}
+              state={{ from: '/items', search: currentSearchParams }}
               className="text-primary hover:underline font-medium text-base block truncate"
             >
               {item.name}
@@ -98,7 +99,7 @@ const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
 MobileItemCard.displayName = 'MobileItemCard'
 
 // Memoized Desktop Item Row Component
-const DesktopItemRow = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
+const DesktopItemRow = memo(({ item, isSelected, canEdit, onToggleSelect, currentSearchParams }) => {
   return (
     <tr className="hover:bg-muted/30 transition-colors">
       {canEdit && (
@@ -131,6 +132,7 @@ const DesktopItemRow = memo(({ item, isSelected, canEdit, onToggleSelect }) => {
         <div>
           <Link
             to={`/items/${item.id}`}
+            state={{ from: '/items', search: currentSearchParams }}
             className="text-primary hover:underline font-medium"
           >
             {item.name}
@@ -624,6 +626,7 @@ export default function Items() {
                   isSelected={selectedItems.has(item.id)}
                   canEdit={canEdit}
                   onToggleSelect={toggleSelectItem}
+                  currentSearchParams={searchParams.toString()}
                 />
               ))}
             </div>
@@ -659,6 +662,7 @@ export default function Items() {
                       isSelected={selectedItems.has(item.id)}
                       canEdit={canEdit}
                       onToggleSelect={toggleSelectItem}
+                      currentSearchParams={searchParams.toString()}
                     />
                   ))}
                 </tbody>

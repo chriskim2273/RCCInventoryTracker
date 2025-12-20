@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -11,6 +11,7 @@ import RelocationConfirmationModal from '@/components/RelocationConfirmationModa
 export default function LocationExplorer() {
   const { locationId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [currentLocation, setCurrentLocation] = useState(null)
   const [childLocations, setChildLocations] = useState([])
   const [items, setItems] = useState([])
@@ -545,11 +546,10 @@ export default function LocationExplorer() {
                       onDragOver={(e) => canEdit && handleDragOver(e, location)}
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => canEdit && handleDrop(e, location)}
-                      className={`block bg-card border rounded-lg p-4 sm:p-6 hover:border-primary transition-colors ${
-                        dragOverLocationId === location.id
+                      className={`block bg-card border rounded-lg p-4 sm:p-6 hover:border-primary transition-colors ${dragOverLocationId === location.id
                           ? 'border-green-500 border-2 bg-green-50 dark:bg-green-950'
                           : ''
-                      }`}
+                        }`}
                     >
                       {location.image_url && (
                         <div className="mb-3">
@@ -634,12 +634,12 @@ export default function LocationExplorer() {
                     <Link
                       key={item.id}
                       to={`/items/${item.id}`}
+                      state={{ from: location.pathname }}
                       draggable={canEdit}
                       onDragStart={(e) => canEdit && handleDragStart(e, item)}
                       onDragEnd={handleDragEnd}
-                      className={`bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative ${
-                        draggedItemId === item.id ? 'opacity-50' : ''
-                      }`}
+                      className={`bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative ${draggedItemId === item.id ? 'opacity-50' : ''
+                        }`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0">

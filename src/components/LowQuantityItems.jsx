@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { AlertTriangle, Package, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import ReorderRequestModal from './ReorderRequestModal'
 
 export default function LowQuantityItems() {
+  const location = useLocation()
   const [lowQuantityItems, setLowQuantityItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [showReorderModal, setShowReorderModal] = useState(false)
@@ -88,6 +89,7 @@ export default function LowQuantityItems() {
                 <div className="flex-1 min-w-0">
                   <Link
                     to={`/items/${item.id}`}
+                    state={{ from: location.pathname }}
                     className="text-primary hover:underline font-medium block truncate"
                   >
                     {item.name}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatTimestamp, formatDate } from '@/lib/utils'
@@ -14,6 +14,7 @@ import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/li
 export default function ItemDetail() {
   const { itemId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { canEdit, user, isAdmin, isCoordinator } = useAuth()
 
   // Admin comments state
@@ -410,7 +411,12 @@ export default function ItemDetail() {
       .eq('id', itemId)
 
     if (!error) {
-      navigate('/locations')
+      if (location.state?.from) {
+        const search = location.state.search ? `?${location.state.search}` : ''
+        navigate(`${location.state.from}${search}`)
+      } else {
+        navigate('/locations')
+      }
     }
   }
 
@@ -903,11 +909,10 @@ export default function ItemDetail() {
                       {adminComments.map((comment) => (
                         <div
                           key={comment.id}
-                          className={`p-3 sm:p-4 rounded-md border ${
-                            comment.resolved_at
+                          className={`p-3 sm:p-4 rounded-md border ${comment.resolved_at
                               ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
                               : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <div className="flex items-center gap-2 flex-wrap">

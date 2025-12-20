@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Package, MapPin, Users, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -8,6 +8,7 @@ import LowQuantityItems from '@/components/LowQuantityItems'
 import { calculateItemAvailability } from '@/lib/itemUtils'
 
 export default function Dashboard() {
+  const location = useLocation()
   const [stats, setStats] = useState({
     totalItems: 0,
     checkedOut: 0,
@@ -173,6 +174,7 @@ export default function Dashboard() {
                   <div className="flex-1 min-w-0">
                     <Link
                       to={`/items/${item.id}`}
+                      state={{ from: location.pathname }}
                       className="text-primary hover:underline font-medium block truncate"
                     >
                       {item.name}
