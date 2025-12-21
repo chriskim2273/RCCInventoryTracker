@@ -12,7 +12,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
     checked_out_to_user_id: '',
     reservation_id: '',
     use_registered_user: false,
-    checked_out_at: new Date().toISOString().slice(0, 16),
+    checked_out_at: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
     quantity: 1,
     notes: '',
   })
@@ -28,7 +28,7 @@ export default function CheckoutModal({ isOpen, onClose, onSuccess, item }) {
         checked_out_to_user_id: '',
         reservation_id: '',
         use_registered_user: false,
-        checked_out_at: new Date().toISOString().slice(0, 16),
+        checked_out_at: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
         quantity: 1,
         notes: '',
       })

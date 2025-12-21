@@ -7,7 +7,7 @@ export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
   const [activeCheckouts, setActiveCheckouts] = useState([])
   const [selectedCheckouts, setSelectedCheckouts] = useState({}) // {checkoutId: quantityToReturn}
   const [formData, setFormData] = useState({
-    checked_in_at: new Date().toISOString().slice(0, 16),
+    checked_in_at: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
     notes: '',
   })
   const [loading, setLoading] = useState(false)
@@ -16,7 +16,7 @@ export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
   useEffect(() => {
     if (isOpen && item) {
       setFormData({
-        checked_in_at: new Date().toISOString().slice(0, 16),
+        checked_in_at: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
         notes: '',
       })
       setSelectedCheckouts({})

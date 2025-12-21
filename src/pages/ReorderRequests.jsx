@@ -1,5 +1,6 @@
 import { useState, useEffect, memo, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { formatDate as utilsFormatDate } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { Plus, Search, ExternalLink, Package, ChevronUp, ChevronDown } from 'lucide-react'
 import ReorderRequestModal from '@/components/ReorderRequestModal'
@@ -40,7 +41,7 @@ const getRelevantDate = (request) => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return 'N/A'
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return utilsFormatDate(dateStr, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -121,9 +122,9 @@ const MobileRequestCard = memo(({ request, onClick }) => {
             <span className="text-muted-foreground">Purchased By:</span>
             <div className="font-medium mt-0.5">
               {request.purchased_by_name ||
-               (request.purchased_by_user?.first_name && request.purchased_by_user?.last_name
-                 ? `${request.purchased_by_user.first_name} ${request.purchased_by_user.last_name}`
-                 : request.purchased_by_user?.email) || 'Unknown'}
+                (request.purchased_by_user?.first_name && request.purchased_by_user?.last_name
+                  ? `${request.purchased_by_user.first_name} ${request.purchased_by_user.last_name}`
+                  : request.purchased_by_user?.email) || 'Unknown'}
             </div>
           </div>
         )}
@@ -225,9 +226,9 @@ const DesktopRequestRow = memo(({ request, onClick }) => {
       </td>
       <td className="px-4 py-3 text-sm">
         {request.purchased_by_name ||
-         (request.purchased_by_user?.first_name && request.purchased_by_user?.last_name
-           ? `${request.purchased_by_user.first_name} ${request.purchased_by_user.last_name}`
-           : request.purchased_by_user?.email) || <span className="text-muted-foreground">—</span>}
+          (request.purchased_by_user?.first_name && request.purchased_by_user?.last_name
+            ? `${request.purchased_by_user.first_name} ${request.purchased_by_user.last_name}`
+            : request.purchased_by_user?.email) || <span className="text-muted-foreground">—</span>}
       </td>
       <td className="px-4 py-3 text-sm max-w-[200px]">
         {request.notes ? (

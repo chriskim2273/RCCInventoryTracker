@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { formatDate as utilsFormatDate, formatTimestamp as utilsFormatTimestamp, parseTimestamp } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
 import ItemPicker, { ItemPickerTrigger } from './ItemPicker'
@@ -32,7 +33,7 @@ const PRIORITY_CONFIG = {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return 'N/A'
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  return utilsFormatDate(dateStr, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -41,7 +42,7 @@ const formatDate = (dateStr) => {
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return 'N/A'
-  return new Date(dateStr).toLocaleString('en-US', {
+  return utilsFormatTimestamp(dateStr, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -124,7 +125,7 @@ export default function ReorderRequestModal({
           item_brand: request.item_brand || '',
           item_model: request.item_model || '',
           item_category_id: request.item_category_id || '',
-          date_requested: request.date_requested ? getLocalDateTimeString(new Date(request.date_requested)) : getLocalDateTimeString(),
+          date_requested: request.date_requested ? getLocalDateTimeString(parseTimestamp(request.date_requested)) : getLocalDateTimeString(),
           priority: request.priority || 'standard',
           quantity_to_order: request.quantity_to_order || 1,
           units_per_pack: request.units_per_pack || '',
@@ -405,7 +406,7 @@ export default function ReorderRequestModal({
         item_brand: request.item_brand || '',
         item_model: request.item_model || '',
         item_category_id: request.item_category_id || '',
-        date_requested: request.date_requested ? getLocalDateTimeString(new Date(request.date_requested)) : getLocalDateTimeString(),
+        date_requested: request.date_requested ? getLocalDateTimeString(parseTimestamp(request.date_requested)) : getLocalDateTimeString(),
         priority: request.priority || 'standard',
         quantity_to_order: request.quantity_to_order || 1,
         units_per_pack: request.units_per_pack || '',

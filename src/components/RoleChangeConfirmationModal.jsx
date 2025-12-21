@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatDate } from '@/lib/utils'
 import { AlertTriangle, User, Shield, Eye, UserCog, Clock } from 'lucide-react'
 import Modal from './Modal'
 
@@ -121,7 +122,7 @@ const RoleChangeConfirmationModal = ({ isOpen, onClose, onConfirm, user, newRole
           <div>
             <p className="text-xs text-muted-foreground mb-1">Account Created</p>
             <p className="text-sm text-foreground">
-              {user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', {
+              {user?.created_at ? formatDate(user.created_at, {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
