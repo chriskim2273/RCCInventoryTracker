@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List } from 'lucide-react'
+import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List, Search } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 import RelocationConfirmationModal from '@/components/RelocationConfirmationModal'
+import LocationSearch from '@/components/LocationSearch'
 
 export default function LocationExplorer() {
   const { locationId } = useParams()
@@ -36,11 +37,46 @@ export default function LocationExplorer() {
     item: null,
     targetLocation: null,
   })
+  const [showSearch, setShowSearch] = useState(false)
+  const [allLocations, setAllLocations] = useState([])
   const { canEdit, isAdmin, user } = useAuth()
 
   useEffect(() => {
     fetchLocationData()
   }, [locationId])
+
+  // Fetch all locations for search functionality
+  useEffect(() => {
+    async function fetchAllLocations() {
+      const { data } = await supabase
+        .from('locations')
+        .select('id, name, path, description, parent_id')
+        .is('deleted_at', null)
+        .order('path')
+      setAllLocations(data || [])
+    }
+    fetchAllLocations()
+  }, [])
+
+  // Keyboard shortcut for search (Cmd+K or Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(true)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  const handleOpenSearch = useCallback(() => {
+    setShowSearch(true)
+  }, [])
+
+  const handleCloseSearch = useCallback(() => {
+    setShowSearch(false)
+  }, [])
 
   const buildBreadcrumbs = async (location) => {
     if (!location) {
@@ -489,46 +525,61 @@ export default function LocationExplorer() {
           )}
         </div>
 
-        {canEdit && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {currentLocation && (
-              <>
-                <button
-                  onClick={() => {
-                    setEditingLocation(currentLocation)
-                    setShowLocationModal(true)
-                  }}
-                  className="flex items-center gap-2 border px-3 sm:px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm"
-                  title="Edit this location"
-                >
-                  <Edit className="h-4 w-4" />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-                {isAdmin && (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Search button - available to all users */}
+          <button
+            onClick={handleOpenSearch}
+            className="flex items-center gap-2 border px-3 sm:px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm"
+            title="Search locations (⌘K)"
+          >
+            <Search className="h-4 w-4" />
+            <span className="hidden sm:inline">Search</span>
+            <kbd className="hidden lg:inline-flex ml-1 px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded font-mono">
+              ⌘K
+            </kbd>
+          </button>
+
+          {canEdit && (
+            <>
+              {currentLocation && (
+                <>
                   <button
-                    onClick={prepareDeleteCurrentLocation}
-                    className="flex items-center gap-2 border border-destructive text-destructive px-3 sm:px-4 py-2 rounded-md hover:bg-destructive/10 transition-colors text-sm"
-                    title="Delete this location"
+                    onClick={() => {
+                      setEditingLocation(currentLocation)
+                      setShowLocationModal(true)
+                    }}
+                    className="flex items-center gap-2 border px-3 sm:px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm"
+                    title="Edit this location"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Delete</span>
+                    <Edit className="h-4 w-4" />
+                    <span className="hidden sm:inline">Edit</span>
                   </button>
-                )}
-              </>
-            )}
-            <button
-              onClick={() => {
-                setEditingLocation(null)
-                setShowLocationModal(true)
-              }}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2 rounded-md hover:opacity-90 text-sm whitespace-nowrap"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden xs:inline">Add Location</span>
-              <span className="xs:hidden">Add</span>
-            </button>
-          </div>
-        )}
+                  {isAdmin && (
+                    <button
+                      onClick={prepareDeleteCurrentLocation}
+                      className="flex items-center gap-2 border border-destructive text-destructive px-3 sm:px-4 py-2 rounded-md hover:bg-destructive/10 transition-colors text-sm"
+                      title="Delete this location"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                  )}
+                </>
+              )}
+              <button
+                onClick={() => {
+                  setEditingLocation(null)
+                  setShowLocationModal(true)
+                }}
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-3 sm:px-4 py-2 rounded-md hover:opacity-90 text-sm whitespace-nowrap"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden xs:inline">Add Location</span>
+                <span className="xs:hidden">Add</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -744,6 +795,12 @@ export default function LocationExplorer() {
         item={relocationData.item}
         currentLocation={currentLocation}
         targetLocation={relocationData.targetLocation}
+      />
+
+      <LocationSearch
+        isOpen={showSearch}
+        onClose={handleCloseSearch}
+        locations={allLocations}
       />
     </div>
   )
