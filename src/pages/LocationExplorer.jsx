@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List, Search } from 'lucide-react'
+import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List, Search, X } from 'lucide-react'
+import { fuzzySearchItems } from '@/lib/fuzzySearchItems'
 import { useAuth } from '@/contexts/AuthContext'
 import ItemModal from '@/components/ItemModal'
 import LocationModal from '@/components/LocationModal'
@@ -39,6 +40,9 @@ export default function LocationExplorer() {
   })
   const [showSearch, setShowSearch] = useState(false)
   const [allLocations, setAllLocations] = useState([])
+  const [itemSearchQuery, setItemSearchQuery] = useState('')
+  const [filteredItems, setFilteredItems] = useState([])
+  const itemSearchRef = useRef(null)
   const { canEdit, isAdmin, user } = useAuth()
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export default function LocationExplorer() {
     fetchAllLocations()
   }, [])
 
-  // Keyboard shortcut for search (Cmd+K or Ctrl+K)
+  // Keyboard shortcut for location search (Cmd+K or Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -69,6 +73,40 @@ export default function LocationExplorer() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Keyboard shortcut for item search (/ key)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only trigger if not in an input and "/" is pressed
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey &&
+          document.activeElement.tagName !== 'INPUT' &&
+          document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault()
+        itemSearchRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Debounced item search filtering
+  useEffect(() => {
+    if (!itemSearchQuery.trim()) {
+      setFilteredItems(items)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setFilteredItems(fuzzySearchItems(items, itemSearchQuery))
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [itemSearchQuery, items])
+
+  // Reset item search when navigating to a new location
+  useEffect(() => {
+    setItemSearchQuery('')
+  }, [locationId])
 
   const handleOpenSearch = useCallback(() => {
     setShowSearch(true)
@@ -647,41 +685,93 @@ export default function LocationExplorer() {
 
           {locationId && (
             <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 sm:mb-4">
-                <h2 className="text-lg sm:text-xl font-semibold">Items at this Location and Sublocations</h2>
-                <div className="flex gap-2">
-                  <div className="relative group">
-                    <Link
-                      to={`/items?location=${locationId}`}
-                      className="flex items-center justify-center gap-2 border px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm sm:text-base"
-                    >
-                      <List className="h-4 w-4" />
-                      View All Items
-                    </Link>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap pointer-events-none z-50">
-                      View all items with multi-select, bulk delete & move
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+              <div className="flex flex-col gap-3 mb-3 sm:mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <h2 className="text-lg sm:text-xl font-semibold">Items at this Location and Sublocations</h2>
+                  <div className="flex gap-2">
+                    <div className="relative group">
+                      <Link
+                        to={`/items?location=${locationId}`}
+                        className="flex items-center justify-center gap-2 border px-4 py-2 rounded-md hover:bg-secondary transition-colors text-sm sm:text-base"
+                      >
+                        <List className="h-4 w-4" />
+                        View All Items
+                      </Link>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap pointer-events-none z-50">
+                        View all items with multi-select, bulk delete & move
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+                      </div>
                     </div>
+                    {canEdit && (
+                      <button
+                        onClick={() => setShowItemModal(true)}
+                        className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Item
+                      </button>
+                    )}
                   </div>
-                  {canEdit && (
-                    <button
-                      onClick={() => setShowItemModal(true)}
-                      className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md hover:opacity-90 text-sm sm:text-base"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Item
-                    </button>
-                  )}
                 </div>
+
+                {/* Item Search Bar */}
+                {items.length > 0 && (
+                  <div className="relative max-w-sm">
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${itemSearchQuery ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <input
+                      ref={itemSearchRef}
+                      type="text"
+                      value={itemSearchQuery}
+                      onChange={(e) => setItemSearchQuery(e.target.value)}
+                      placeholder="Search items..."
+                      className="w-full pl-9 pr-16 py-2 text-sm bg-background border rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                    />
+                    {itemSearchQuery && (
+                      <button
+                        onClick={() => setItemSearchQuery('')}
+                        className="absolute right-8 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:inline-flex px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded font-mono">/</kbd>
+                  </div>
+                )}
+
+                {/* Results count indicator */}
+                {itemSearchQuery && items.length > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    Showing {filteredItems.length} of {items.length} item{items.length !== 1 ? 's' : ''}
+                    {filteredItems.length === 0 && (
+                      <button
+                        onClick={() => setItemSearchQuery('')}
+                        className="ml-2 text-primary hover:underline"
+                      >
+                        Clear search
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {items.length === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
                   No items at this location
                 </div>
+              ) : filteredItems.length === 0 && itemSearchQuery ? (
+                <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
+                  <Search className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                  <p>No items match "{itemSearchQuery}"</p>
+                  <button
+                    onClick={() => setItemSearchQuery('')}
+                    className="mt-2 text-primary hover:underline"
+                  >
+                    Clear search
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  {items.map((item) => (
+                  {filteredItems.map((item) => (
                     <Link
                       key={item.id}
                       to={`/items/${item.id}`}
