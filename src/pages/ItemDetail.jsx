@@ -910,8 +910,8 @@ export default function ItemDetail() {
                         <div
                           key={comment.id}
                           className={`p-3 sm:p-4 rounded-md border ${comment.resolved_at
-                              ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
-                              : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
+                            ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
+                            : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
                             }`}
                         >
                           <div className="flex items-start justify-between gap-2 mb-2">
@@ -1115,7 +1115,7 @@ export default function ItemDetail() {
                   </div>
 
                   {/* Request Restock Button - Admin/Coordinator only */}
-                  {(isAdmin || isCoordinator) && (
+                  {(isAdmin) && (
                     <button
                       onClick={() => setShowReorderModal(true)}
                       className="w-full flex items-center justify-center gap-2 bg-indigo-500 text-white px-4 py-2 rounded-md hover:bg-indigo-600 transition-colors mt-2"

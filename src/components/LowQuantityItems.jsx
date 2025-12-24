@@ -112,7 +112,7 @@ export default function LowQuantityItems() {
                     <span>{item.min_quantity}</span>
                   </p>
                 </div>
-                {(isAdmin || isCoordinator) && (
+                {(isAdmin) && (
                   <button
                     onClick={() => {
                       setSelectedItem(item)
