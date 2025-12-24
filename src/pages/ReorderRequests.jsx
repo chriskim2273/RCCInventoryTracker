@@ -297,7 +297,7 @@ export default function ReorderRequests() {
     try {
       const [categoriesResult, locationsResult] = await Promise.all([
         supabase.from('categories').select('*').is('deleted_at', null).order('name'),
-        supabase.from('locations').select('*').is('deleted_at', null).order('path'),
+        supabase.from('locations').select('*').is('deleted_at', null).is('parent_id', null).order('path'),
       ])
 
       if (categoriesResult.data) setCategories(categoriesResult.data)
