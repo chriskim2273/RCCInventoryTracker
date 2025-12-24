@@ -107,6 +107,7 @@ export default function ReorderRequestModal({
     purchased_by: '',
     purchased_by_name: '',
     use_registered_purchaser: true,
+    rejection_reason: '',
   })
 
   const isExistingRequest = !!request
@@ -149,6 +150,7 @@ export default function ReorderRequestModal({
           purchased_by: request.purchased_by || '',
           purchased_by_name: request.purchased_by_name || '',
           use_registered_purchaser: !!request.purchased_by || !request.purchased_by_name,
+          rejection_reason: request.rejection_reason || '',
         })
       } else if (preselectedItem) {
         // Creating from item detail page - start in edit mode
@@ -494,10 +496,11 @@ export default function ReorderRequestModal({
 
       const updateData = {
         status: statusFormData.status,
+        rejection_reason: statusFormData.status === 'rejected' ? statusFormData.rejection_reason : null,
       }
 
       // Handle purchased_by field
-      if (statusFormData.status !== 'new_request' && statusFormData.status !== 'rejected') {
+      if (statusFormData.status !== 'new_request' && statusFormData.status !== 'rejected' && statusFormData.status !== 'approved_pending') {
         if (statusFormData.use_registered_purchaser && statusFormData.purchased_by) {
           updateData.purchased_by = statusFormData.purchased_by
           updateData.purchased_by_name = statusFormData.purchased_by_name
@@ -557,6 +560,7 @@ export default function ReorderRequestModal({
       purchased_by: request?.purchased_by || '',
       purchased_by_name: request?.purchased_by_name || '',
       use_registered_purchaser: !!request?.purchased_by || !request?.purchased_by_name,
+      rejection_reason: request?.rejection_reason || '',
     })
     setMode('view')
     setError(null)
@@ -689,6 +693,14 @@ export default function ReorderRequestModal({
               {priorityConfig.label} Priority
             </span>
           </div>
+
+          {/* Rejection Reason */}
+          {formData.status === 'rejected' && request?.rejection_reason && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-md text-sm">
+              <span className="font-medium block mb-1">Rejection Reason:</span>
+              <p>{request.rejection_reason}</p>
+            </div>
+          )}
 
           {/* Item Details */}
           <div className="bg-muted/50 p-4 rounded-lg">
@@ -969,8 +981,23 @@ export default function ReorderRequestModal({
             </select>
           </div>
 
-          {/* Purchased By - only show for relevant statuses */}
-          {statusFormData.status !== 'new_request' && statusFormData.status !== 'rejected' && (
+          {/* Rejection Reason - only show for rejected status */}
+          {statusFormData.status === 'rejected' && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Rejection Reason *</label>
+              <textarea
+                required
+                value={statusFormData.rejection_reason}
+                onChange={(e) => setStatusFormData({ ...statusFormData, rejection_reason: e.target.value })}
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                rows="3"
+                placeholder="Please enter a reason for rejection..."
+              />
+            </div>
+          )}
+
+          {/* Purchased By - only show for relevant statuses (purchased, arrived, documented) */}
+          {statusFormData.status !== 'new_request' && statusFormData.status !== 'rejected' && statusFormData.status !== 'approved_pending' && (
             <div>
               <label className="block text-sm font-medium mb-2">
                 Purchased By {statusFormData.status === 'purchased' && <span className="text-destructive">*</span>}
