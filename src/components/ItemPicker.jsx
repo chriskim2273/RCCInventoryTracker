@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Search, X, Package, Check, Sparkles, ChevronRight, Tag } from 'lucide-react'
+import { Search, X, Package, Check, Sparkles, ChevronRight, Tag, MapPin } from 'lucide-react'
 import Fuse from 'fuse.js'
 
 /**
@@ -14,6 +14,7 @@ import Fuse from 'fuse.js'
 export default function ItemPicker({
   items = [],
   categories = [],
+  locations = [],
   selectedItemId,
   onSelect,
   onClose,
@@ -35,6 +36,41 @@ export default function ItemPicker({
     })
     return map
   }, [categories])
+
+  // Build location lookup map
+  const locationMap = useMemo(() => {
+    const map = {}
+    locations.forEach(loc => {
+      map[loc.id] = loc
+    })
+    return map
+  }, [locations])
+
+  // Build location path map
+  const locationPathMap = useMemo(() => {
+    const pathMap = {}
+
+    // Helper to get path for a single location
+    const getPath = (locId) => {
+      if (!locId || !locationMap[locId]) return ''
+
+      const parts = []
+      let current = locationMap[locId]
+
+      while (current) {
+        parts.unshift(current.name)
+        current = current.parent_id ? locationMap[current.parent_id] : null
+      }
+
+      return parts.join(' > ')
+    }
+
+    locations.forEach(loc => {
+      pathMap[loc.id] = getPath(loc.id)
+    })
+
+    return pathMap
+  }, [locations, locationMap])
 
   // Fuse.js configuration for fuzzy search
   const fuse = useMemo(() => {
@@ -158,7 +194,7 @@ export default function ItemPicker({
       {/* Command Palette - Full height on mobile, constrained on desktop */}
       <div className="relative w-full h-[calc(100%-2rem)] sm:h-auto max-w-2xl mx-2 sm:mx-4 animate-slide-up flex flex-col">
         {/* Glass container */}
-        <div className="bg-card/98 sm:bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl shadow-black/30 overflow-hidden flex flex-col h-full sm:h-auto">
+        <div className="bg-white dark:bg-zinc-950 sm:bg-white/95 sm:dark:bg-zinc-950/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl shadow-black/30 overflow-hidden flex flex-col h-full sm:h-auto">
 
           {/* Search header */}
           <div className="relative border-b border-border/50 flex-shrink-0">
@@ -210,11 +246,10 @@ export default function ItemPicker({
               <div className="px-4 sm:px-5 pb-3 flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
                 <button
                   onClick={() => setSelectedCategory(null)}
-                  className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                    !selectedCategory
-                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
-                      : 'bg-muted/80 text-muted-foreground hover:bg-muted active:scale-95'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${!selectedCategory
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                    : 'bg-muted/80 text-muted-foreground hover:bg-muted active:scale-95'
+                    }`}
                 >
                   <Sparkles className="h-3 w-3" />
                   All
@@ -223,11 +258,10 @@ export default function ItemPicker({
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-                      selectedCategory === cat.id
-                        ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
-                        : 'bg-muted/80 text-muted-foreground hover:bg-muted active:scale-95'
-                    }`}
+                    className={`flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-200 ${selectedCategory === cat.id
+                      ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
+                      : 'bg-muted/80 text-muted-foreground hover:bg-muted active:scale-95'
+                      }`}
                     style={{ animationDelay: `${idx * 30}ms` }}
                   >
                     <span>{cat.icon}</span>
@@ -257,6 +291,7 @@ export default function ItemPicker({
               <div className="py-1 sm:py-2">
                 {filteredItems.map((item, index) => {
                   const category = categoryMap[item.category_id]
+                  const locationPath = locationPathMap[item.location_id]
                   const isHighlighted = index === highlightedIndex
                   const isSelected = item.id === selectedItemId
 
@@ -266,21 +301,19 @@ export default function ItemPicker({
                       ref={el => itemRefs.current[index] = el}
                       onClick={() => onSelect(item)}
                       onMouseEnter={() => setHighlightedIndex(index)}
-                      className={`w-full px-4 sm:px-5 py-3.5 sm:py-3.5 flex items-center gap-3 sm:gap-4 text-left transition-all duration-150 group active:bg-primary/15 ${
-                        isHighlighted
-                          ? 'bg-primary/10'
-                          : 'hover:bg-muted/50'
-                      } ${isSelected ? 'bg-primary/5' : ''}`}
+                      className={`w-full px-4 sm:px-5 py-3.5 sm:py-3.5 flex items-center gap-3 sm:gap-4 text-left transition-all duration-150 group active:bg-primary/15 ${isHighlighted
+                        ? 'bg-primary/10'
+                        : 'hover:bg-muted/50'
+                        } ${isSelected ? 'bg-primary/5' : ''}`}
                       style={{
                         animationDelay: `${Math.min(index * 20, 200)}ms`,
                       }}
                     >
                       {/* Item icon/avatar */}
-                      <div className={`flex-shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-200 ${
-                        isHighlighted
-                          ? 'bg-primary/20 scale-105'
-                          : 'bg-muted/80 group-hover:bg-muted'
-                      }`}>
+                      <div className={`flex-shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all duration-200 ${isHighlighted
+                        ? 'bg-primary/20 scale-105'
+                        : 'bg-muted/80 group-hover:bg-muted'
+                        }`}>
                         {category?.icon ? (
                           <span className="text-lg sm:text-xl">{category.icon}</span>
                         ) : (
@@ -326,14 +359,21 @@ export default function ItemPicker({
                             </span>
                           </div>
                         )}
+                        {locationPath && (
+                          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                            <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-muted-foreground/50 flex-shrink-0" />
+                            <span className="text-[10px] sm:text-xs text-muted-foreground/70 truncate">
+                              {locationPath}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Arrow indicator - hidden on mobile */}
-                      <ChevronRight className={`hidden sm:block flex-shrink-0 h-5 w-5 transition-all duration-200 ${
-                        isHighlighted
-                          ? 'text-primary opacity-100 translate-x-0'
-                          : 'text-muted-foreground/30 opacity-0 -translate-x-2'
-                      }`} />
+                      <ChevronRight className={`hidden sm:block flex-shrink-0 h-5 w-5 transition-all duration-200 ${isHighlighted
+                        ? 'text-primary opacity-100 translate-x-0'
+                        : 'text-muted-foreground/30 opacity-0 -translate-x-2'
+                        }`} />
                     </button>
                   )
                 })}
@@ -386,28 +426,24 @@ export function ItemPickerTrigger({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`w-full text-left group transition-all duration-200 ${
-        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-      }`}
+      className={`w-full text-left group transition-all duration-200 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+        }`}
     >
-      <div className={`relative flex items-center gap-3 px-3 sm:px-4 py-3 sm:py-3 border rounded-xl transition-all duration-200 ${
-        selectedItem
-          ? 'border-primary/30 bg-primary/5 hover:border-primary/50'
-          : 'border-border hover:border-primary/30 hover:bg-muted/30'
-      } ${disabled ? '' : 'group-hover:shadow-lg group-hover:shadow-primary/5 active:scale-[0.99]'}`}>
+      <div className={`relative flex items-center gap-3 px-3 sm:px-4 py-3 sm:py-3 border rounded-xl transition-all duration-200 ${selectedItem
+        ? 'border-primary/30 bg-primary/5 hover:border-primary/50'
+        : 'border-border hover:border-primary/30 hover:bg-muted/30'
+        } ${disabled ? '' : 'group-hover:shadow-lg group-hover:shadow-primary/5 active:scale-[0.99]'}`}>
 
         {/* Icon */}
-        <div className={`flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center transition-all duration-200 ${
-          selectedItem
-            ? 'bg-primary/10'
-            : 'bg-muted group-hover:bg-primary/10'
-        }`}>
+        <div className={`flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center transition-all duration-200 ${selectedItem
+          ? 'bg-primary/10'
+          : 'bg-muted group-hover:bg-primary/10'
+          }`}>
           {selectedItem && category?.icon ? (
             <span className="text-base sm:text-lg">{category.icon}</span>
           ) : (
-            <Package className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors duration-200 ${
-              selectedItem ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'
-            }`} />
+            <Package className={`h-4 w-4 sm:h-5 sm:w-5 transition-colors duration-200 ${selectedItem ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'
+              }`} />
           )}
         </div>
 
@@ -434,11 +470,10 @@ export function ItemPickerTrigger({
         </div>
 
         {/* Search hint */}
-        <div className={`flex-shrink-0 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
-          selectedItem
-            ? 'bg-primary/10 text-primary'
-            : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
-        }`}>
+        <div className={`flex-shrink-0 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg transition-all duration-200 ${selectedItem
+          ? 'bg-primary/10 text-primary'
+          : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
+          }`}>
           <Search className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           <span className="text-[10px] sm:text-xs font-medium hidden sm:inline">Search</span>
         </div>

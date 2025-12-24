@@ -1367,6 +1367,7 @@ export default function ReorderRequestModal({
       <ItemPicker
         items={items}
         categories={categories}
+        locations={locations}
         selectedItemId={formData.item_id}
         onSelect={handleItemPickerSelect}
         onClose={() => setShowItemPicker(false)}

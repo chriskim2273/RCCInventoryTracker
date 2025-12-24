@@ -1709,7 +1709,8 @@ export default function AdminPanel() {
                               <select
                                 value={user.role}
                                 onChange={(e) => prepareRoleChange(user, e.target.value)}
-                                className="text-sm border rounded px-2 py-1 bg-background"
+                                disabled={isProtectedUser(user.email)}
+                                className="text-sm border rounded px-2 py-1 bg-background disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <option value="pending">Pending</option>
                                 <option value="viewer">Viewer</option>
@@ -3115,8 +3116,8 @@ export default function AdminPanel() {
                               <div
                                 key={comment.id}
                                 className={`p-3 rounded-md border mt-3 ${comment.resolved_at
-                                    ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
-                                    : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
+                                  ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
+                                  : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
                                   }`}
                               >
                                 <div className="flex items-start justify-between gap-2 mb-2">
