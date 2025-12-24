@@ -79,7 +79,7 @@ export default function AdminPanel() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [showCenterDropdown, setShowCenterDropdown] = useState(false)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
-  const { user: currentUser, canManageUsers } = useAuth()
+  const { user: currentUser, canManageUsers, isAdmin } = useAuth()
 
   // Protected users that cannot be deleted
   const PROTECTED_EMAILS = [
@@ -1645,7 +1645,7 @@ export default function AdminPanel() {
                       <tr>
                         <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                        {isAdmin && <th className="px-4 py-3 text-left text-sm font-medium">Status</th>}
                         <th className="px-4 py-3 text-left text-sm font-medium">Role</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Last Sign In</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Change Role</th>
@@ -1663,26 +1663,28 @@ export default function AdminPanel() {
                               : 'N/A'}
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              {user.confirmed ? (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  <CheckCircle className="h-3 w-3" />
-                                  Verified
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                  <XCircle className="h-3 w-3" />
-                                  Unverified
-                                </span>
-                              )}
-                              {user.banned && (
-                                <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                  Banned
-                                </span>
-                              )}
-                            </div>
-                          </td>
+                          {isAdmin && (
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                {user.confirmed ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Verified
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                    <XCircle className="h-3 w-3" />
+                                    Unverified
+                                  </span>
+                                )}
+                                {user.banned && (
+                                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    Banned
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          )}
                           <td className="px-4 py-3">
                             <span
                               className={`inline-flex px-2 py-1 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
@@ -3112,11 +3114,10 @@ export default function AdminPanel() {
                             {data.comments.map((comment) => (
                               <div
                                 key={comment.id}
-                                className={`p-3 rounded-md border mt-3 ${
-                                  comment.resolved_at
+                                className={`p-3 rounded-md border mt-3 ${comment.resolved_at
                                     ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900'
                                     : 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <div className="flex items-center gap-2 flex-wrap">
