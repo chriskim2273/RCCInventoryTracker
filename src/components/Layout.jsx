@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
   Package,
@@ -13,11 +13,33 @@ import {
   Heart
 } from 'lucide-react'
 import sbuLogo from '@/assets/white-star.svg'
+import ChangelogModal, { STORAGE_KEY } from './ChangelogModal'
 
 export default function Layout() {
   const { signOut, user, userRole, isAdmin, isCoordinator } = useAuth()
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showChangelog, setShowChangelog] = useState(false)
+
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem(STORAGE_KEY)
+      if (!dismissed) {
+        setShowChangelog(true)
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [])
+
+  const handleCloseChangelog = () => {
+    setShowChangelog(false)
+    try {
+      localStorage.setItem(STORAGE_KEY, 'true')
+    } catch {
+      // Ignore localStorage errors
+    }
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -214,6 +236,8 @@ export default function Layout() {
           </Link>
         </div>
       </footer>
+
+      <ChangelogModal isOpen={showChangelog} onClose={handleCloseChangelog} />
     </div>
   )
 }
