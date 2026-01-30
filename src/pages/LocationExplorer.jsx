@@ -42,6 +42,7 @@ export default function LocationExplorer() {
   const [allLocations, setAllLocations] = useState([])
   const [itemSearchQuery, setItemSearchQuery] = useState('')
   const [filteredItems, setFilteredItems] = useState([])
+  const [showSublocationItems, setShowSublocationItems] = useState(true)
   const itemSearchRef = useRef(null)
   const { canEdit, isAdmin, user } = useAuth()
 
@@ -103,10 +104,16 @@ export default function LocationExplorer() {
     return () => clearTimeout(timer)
   }, [itemSearchQuery, items])
 
-  // Reset item search when navigating to a new location
+  // Reset item search and sublocation filter when navigating to a new location
   useEffect(() => {
     setItemSearchQuery('')
+    setShowSublocationItems(true)
   }, [locationId])
+
+  // Apply sublocation filter on top of search filter
+  const displayedItems = showSublocationItems
+    ? filteredItems
+    : filteredItems.filter(item => item.location_id === locationId)
 
   const handleOpenSearch = useCallback(() => {
     setShowSearch(true)
@@ -687,7 +694,29 @@ export default function LocationExplorer() {
             <div>
               <div className="flex flex-col gap-3 mb-3 sm:mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <h2 className="text-lg sm:text-xl font-semibold">Items at this Location and Sublocations</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg sm:text-xl font-semibold">
+                      {showSublocationItems ? 'Items at this Location and Sublocations' : 'Items at this Location Only'}
+                    </h2>
+                    {childLocations.length > 0 && (
+                      <button
+                        onClick={() => setShowSublocationItems(!showSublocationItems)}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                          showSublocationItems ? 'bg-primary' : 'bg-muted'
+                        }`}
+                        role="switch"
+                        aria-checked={showSublocationItems}
+                        aria-label="Include sublocation items"
+                        title={showSublocationItems ? 'Click to show this location only' : 'Click to include sublocations'}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            showSublocationItems ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <div className="relative group">
                       <Link
@@ -739,15 +768,19 @@ export default function LocationExplorer() {
                 )}
 
                 {/* Results count indicator */}
-                {itemSearchQuery && items.length > 0 && (
+                {(itemSearchQuery || !showSublocationItems) && items.length > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    Showing {filteredItems.length} of {items.length} item{items.length !== 1 ? 's' : ''}
-                    {filteredItems.length === 0 && (
+                    Showing {displayedItems.length} of {items.length} item{items.length !== 1 ? 's' : ''}
+                    {!showSublocationItems && <span className="ml-1">(this location only)</span>}
+                    {displayedItems.length === 0 && (
                       <button
-                        onClick={() => setItemSearchQuery('')}
+                        onClick={() => {
+                          setItemSearchQuery('')
+                          setShowSublocationItems(true)
+                        }}
                         className="ml-2 text-primary hover:underline"
                       >
-                        Clear search
+                        Clear filters
                       </button>
                     )}
                   </div>
@@ -758,20 +791,30 @@ export default function LocationExplorer() {
                 <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
                   No items at this location
                 </div>
-              ) : filteredItems.length === 0 && itemSearchQuery ? (
+              ) : displayedItems.length === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
                   <Search className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                  <p>No items match "{itemSearchQuery}"</p>
+                  <p>
+                    {itemSearchQuery
+                      ? `No items match "${itemSearchQuery}"`
+                      : 'No items directly at this location'}
+                    {!showSublocationItems && !itemSearchQuery && (
+                      <span className="block mt-1 text-xs">Items may exist in sublocations</span>
+                    )}
+                  </p>
                   <button
-                    onClick={() => setItemSearchQuery('')}
+                    onClick={() => {
+                      setItemSearchQuery('')
+                      setShowSublocationItems(true)
+                    }}
                     className="mt-2 text-primary hover:underline"
                   >
-                    Clear search
+                    {itemSearchQuery ? 'Clear search' : 'Show all items'}
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  {filteredItems.map((item) => (
+                  {displayedItems.map((item) => (
                     <Link
                       key={item.id}
                       to={`/items/${item.id}`}
