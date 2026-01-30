@@ -225,6 +225,29 @@ export default function Items() {
     fetchData()
   }, [])
 
+  // Re-fetch locations when the page becomes visible again (to catch renames)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Refresh locations data to catch any name changes made elsewhere
+        const refreshLocations = async () => {
+          const { data: locationsData } = await supabase
+            .from('locations')
+            .select('*')
+            .is('deleted_at', null)
+            .order('path')
+          if (locationsData) {
+            setLocations(locationsData)
+          }
+        }
+        refreshLocations()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   // Filter items when dependencies change
   useEffect(() => {
     filterItems()

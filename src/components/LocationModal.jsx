@@ -15,6 +15,7 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
   const [error, setError] = useState(null)
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [shouldRemoveImage, setShouldRemoveImage] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -35,6 +36,7 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
         setImagePreview(null)
       }
       setImageFile(null)
+      setShouldRemoveImage(false)
       setError(null)
     }
   }, [isOpen, location, parentId])
@@ -79,6 +81,7 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
         const fileToUse = compressedFile.size < file.size ? compressedFile : file
 
         setImageFile(fileToUse)
+        setShouldRemoveImage(false)  // Reset removal flag when new image is selected
         const reader = new FileReader()
         reader.onloadend = () => {
           setImagePreview(reader.result)
@@ -108,6 +111,10 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
   }
 
   const removeImage = () => {
+    // If there's an existing image from the database, mark it for removal
+    if (location?.image_url && !imageFile) {
+      setShouldRemoveImage(true)
+    }
     setImageFile(null)
     setImagePreview(null)
   }
@@ -119,6 +126,11 @@ export default function LocationModal({ isOpen, onClose, onSuccess, location = n
 
     try {
       let imageUrl = location?.image_url || null
+
+      // Handle image removal
+      if (shouldRemoveImage) {
+        imageUrl = null
+      }
 
       // Upload image if new file selected
       if (imageFile) {

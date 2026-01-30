@@ -79,6 +79,8 @@ export default function AdminPanel() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
   const [showCenterDropdown, setShowCenterDropdown] = useState(false)
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
+  const [actionFeedback, setActionFeedback] = useState({ show: false, message: '', type: 'success' })
+  const [processingAction, setProcessingAction] = useState(null) // Track which action is processing
   const { user: currentUser, canManageUsers, isAdmin } = useAuth()
 
   // Protected users that cannot be deleted
@@ -857,7 +859,7 @@ export default function AdminPanel() {
   }
 
   const handleDeleteAdminComment = async (commentId) => {
-    if (!confirm('Are you sure you want to delete this comment?')) return
+    setProcessingAction(`delete-comment-${commentId}`)
 
     try {
       const { error } = await supabase
@@ -866,9 +868,13 @@ export default function AdminPanel() {
         .eq('id', commentId)
 
       if (error) throw error
+      showFeedback('Comment deleted successfully')
       fetchData()
     } catch (error) {
       console.error('Error deleting comment:', error)
+      showFeedback('Failed to delete comment. Please try again.', 'error')
+    } finally {
+      setProcessingAction(null)
     }
   }
 
@@ -1170,25 +1176,35 @@ export default function AdminPanel() {
     }
   }
 
+  // Helper function to show feedback notifications
+  const showFeedback = (message, type = 'success') => {
+    setActionFeedback({ show: true, message, type })
+    setTimeout(() => setActionFeedback({ show: false, message: '', type: 'success' }), 3000)
+  }
+
   const restoreItem = async (itemId) => {
-    if (!confirm('Are you sure you want to restore this item?')) return
+    setProcessingAction(`restore-item-${itemId}`)
 
-    // Get the item details for logging
-    const { data: itemData } = await supabase
-      .from('items')
-      .select('name, serial_number')
-      .eq('id', itemId)
-      .single()
+    try {
+      // Get the item details for logging
+      const { data: itemData, error: fetchError } = await supabase
+        .from('items')
+        .select('name, serial_number')
+        .eq('id', itemId)
+        .single()
 
-    const { error } = await supabase
-      .from('items')
-      .update({
-        deleted_at: null,
-        deleted_by: null,
-      })
-      .eq('id', itemId)
+      if (fetchError) throw fetchError
 
-    if (!error) {
+      const { error } = await supabase
+        .from('items')
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+        })
+        .eq('id', itemId)
+
+      if (error) throw error
+
       // Log to admin audit logs
       await supabase.from('audit_logs').insert({
         user_id: currentUser?.id,
@@ -1200,29 +1216,39 @@ export default function AdminPanel() {
         },
       })
 
+      showFeedback(`Item "${itemData?.name}" restored successfully`)
       fetchData()
+    } catch (error) {
+      console.error('Error restoring item:', error)
+      showFeedback('Failed to restore item. Please try again.', 'error')
+    } finally {
+      setProcessingAction(null)
     }
   }
 
   const restoreLocation = async (locationId) => {
-    if (!confirm('Are you sure you want to restore this location?')) return
+    setProcessingAction(`restore-location-${locationId}`)
 
-    // Get the location details for logging
-    const { data: locationData } = await supabase
-      .from('locations')
-      .select('name, path')
-      .eq('id', locationId)
-      .single()
+    try {
+      // Get the location details for logging
+      const { data: locationData, error: fetchError } = await supabase
+        .from('locations')
+        .select('name, path')
+        .eq('id', locationId)
+        .single()
 
-    const { error } = await supabase
-      .from('locations')
-      .update({
-        deleted_at: null,
-        deleted_by: null,
-      })
-      .eq('id', locationId)
+      if (fetchError) throw fetchError
 
-    if (!error) {
+      const { error } = await supabase
+        .from('locations')
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+        })
+        .eq('id', locationId)
+
+      if (error) throw error
+
       // Log to admin audit logs
       await supabase.from('audit_logs').insert({
         user_id: currentUser?.id,
@@ -1234,29 +1260,39 @@ export default function AdminPanel() {
         },
       })
 
+      showFeedback(`Location "${locationData?.name}" restored successfully`)
       fetchData()
+    } catch (error) {
+      console.error('Error restoring location:', error)
+      showFeedback('Failed to restore location. Please try again.', 'error')
+    } finally {
+      setProcessingAction(null)
     }
   }
 
   const restoreCategory = async (categoryId) => {
-    if (!confirm('Are you sure you want to restore this category?')) return
+    setProcessingAction(`restore-category-${categoryId}`)
 
-    // Get the category details for logging
-    const { data: categoryData } = await supabase
-      .from('categories')
-      .select('name')
-      .eq('id', categoryId)
-      .single()
+    try {
+      // Get the category details for logging
+      const { data: categoryData, error: fetchError } = await supabase
+        .from('categories')
+        .select('name')
+        .eq('id', categoryId)
+        .single()
 
-    const { error } = await supabase
-      .from('categories')
-      .update({
-        deleted_at: null,
-        deleted_by: null,
-      })
-      .eq('id', categoryId)
+      if (fetchError) throw fetchError
 
-    if (!error) {
+      const { error } = await supabase
+        .from('categories')
+        .update({
+          deleted_at: null,
+          deleted_by: null,
+        })
+        .eq('id', categoryId)
+
+      if (error) throw error
+
       // Log to admin audit logs
       await supabase.from('audit_logs').insert({
         user_id: currentUser?.id,
@@ -1267,7 +1303,13 @@ export default function AdminPanel() {
         },
       })
 
+      showFeedback(`Category "${categoryData?.name}" restored successfully`)
       fetchData()
+    } catch (error) {
+      console.error('Error restoring category:', error)
+      showFeedback('Failed to restore category. Please try again.', 'error')
+    } finally {
+      setProcessingAction(null)
     }
   }
 
@@ -1402,6 +1444,28 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Action Feedback Toast */}
+      {actionFeedback.show && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            actionFeedback.type === 'error'
+              ? 'bg-destructive text-destructive-foreground'
+              : 'bg-green-600 text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {actionFeedback.type === 'error' ? (
+              <XCircle className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <CheckCircle className="h-5 w-5" aria-hidden="true" />
+            )}
+            <span className="text-sm font-medium">{actionFeedback.message}</span>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">Admin Panel</h1>
         <p className="text-sm sm:text-base text-muted-foreground">Manage users, categories, and view audit logs</p>
@@ -2566,65 +2630,69 @@ export default function AdminPanel() {
                     </div>
                   ) : (
                     <div className="bg-card border rounded-lg overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {filteredDeletedItems.map((item) => (
-                            <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                              <td className="px-4 py-3">
-                                <Link to={`/items/${item.id}`} className="font-medium text-primary hover:underline">
-                                  {item.name}
-                                </Link>
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {item.category?.name ? (
-                                  <Link to={`/items?category=${item.category_id}`} className="text-primary hover:underline">
-                                    {item.category.name}
-                                  </Link>
-                                ) : 'N/A'}
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                {item.location ? (
-                                  <Link to={`/locations/${item.location_id}`} className="text-primary hover:underline">
-                                    {item.location.path || item.location.name}
-                                  </Link>
-                                ) : 'N/A'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {formatTimestamp(item.deleted_at)}
-                              </td>
-                              <td className="px-4 py-3 text-sm">{getUserDisplayName(item.deleted_by_user, item.deleted_by_name)}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => restoreItem(item.id)}
-                                    className="flex items-center gap-1 text-sm text-primary hover:underline"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5" />
-                                    Restore
-                                  </button>
-                                  <button
-                                    onClick={() => prepareHardDeleteItem(item.id)}
-                                    className="flex items-center gap-1 text-sm text-destructive hover:underline"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                    Hard Delete
-                                  </button>
-                                </div>
-                              </td>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[700px]">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Location</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y">
+                            {filteredDeletedItems.map((item) => (
+                              <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="px-4 py-3">
+                                  <Link to={`/items/${item.id}`} className="font-medium text-primary hover:underline">
+                                    {item.name}
+                                  </Link>
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.category?.name ? (
+                                    <Link to={`/items?category=${item.category_id}`} className="text-primary hover:underline">
+                                      {item.category.name}
+                                    </Link>
+                                  ) : 'N/A'}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.location ? (
+                                    <Link to={`/locations/${item.location_id}`} className="text-primary hover:underline">
+                                      {item.location.path || item.location.name}
+                                    </Link>
+                                  ) : 'N/A'}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                                  {formatTimestamp(item.deleted_at)}
+                                </td>
+                                <td className="px-4 py-3 text-sm whitespace-nowrap">{getUserDisplayName(item.deleted_by_user, item.deleted_by_name)}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3 whitespace-nowrap">
+                                    <button
+                                      onClick={() => restoreItem(item.id)}
+                                      disabled={processingAction === `restore-item-${item.id}`}
+                                      className="flex items-center gap-1 text-sm text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <RotateCcw className={`h-3.5 w-3.5 ${processingAction === `restore-item-${item.id}` ? 'animate-spin' : ''}`} />
+                                      {processingAction === `restore-item-${item.id}` ? 'Restoring...' : 'Restore'}
+                                    </button>
+                                    <button
+                                      onClick={() => prepareHardDeleteItem(item.id)}
+                                      disabled={processingAction !== null}
+                                      className="flex items-center gap-1 text-sm text-destructive hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Hard Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2640,51 +2708,55 @@ export default function AdminPanel() {
                     </div>
                   ) : (
                     <div className="bg-card border rounded-lg overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Path</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {filteredDeletedLocations.map((location) => (
-                            <tr key={location.id} className="hover:bg-muted/30 transition-colors">
-                              <td className="px-4 py-3">
-                                <Link to={`/locations/${location.id}`} className="font-medium text-primary hover:underline">
-                                  {location.name}
-                                </Link>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {formatTimestamp(location.deleted_at)}
-                              </td>
-                              <td className="px-4 py-3 text-sm">{getUserDisplayName(location.deleted_by_user, location.deleted_by_name)}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => restoreLocation(location.id)}
-                                    className="flex items-center gap-1 text-sm text-primary hover:underline"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5" />
-                                    Restore
-                                  </button>
-                                  <button
-                                    onClick={() => prepareHardDeleteLocation(location.id)}
-                                    className="flex items-center gap-1 text-sm text-destructive hover:underline"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                    Hard Delete
-                                  </button>
-                                </div>
-                              </td>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[600px]">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Path</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y">
+                            {filteredDeletedLocations.map((location) => (
+                              <tr key={location.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="px-4 py-3">
+                                  <Link to={`/locations/${location.id}`} className="font-medium text-primary hover:underline">
+                                    {location.name}
+                                  </Link>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground">{location.path}</td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                                  {formatTimestamp(location.deleted_at)}
+                                </td>
+                                <td className="px-4 py-3 text-sm whitespace-nowrap">{getUserDisplayName(location.deleted_by_user, location.deleted_by_name)}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3 whitespace-nowrap">
+                                    <button
+                                      onClick={() => restoreLocation(location.id)}
+                                      disabled={processingAction === `restore-location-${location.id}`}
+                                      className="flex items-center gap-1 text-sm text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <RotateCcw className={`h-3.5 w-3.5 ${processingAction === `restore-location-${location.id}` ? 'animate-spin' : ''}`} />
+                                      {processingAction === `restore-location-${location.id}` ? 'Restoring...' : 'Restore'}
+                                    </button>
+                                    <button
+                                      onClick={() => prepareHardDeleteLocation(location.id)}
+                                      disabled={processingAction !== null}
+                                      className="flex items-center gap-1 text-sm text-destructive hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Hard Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -2700,47 +2772,51 @@ export default function AdminPanel() {
                     </div>
                   ) : (
                     <div className="bg-card border rounded-lg overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Icon</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
-                            <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {filteredDeletedCategories.map((category) => (
-                            <tr key={category.id} className="hover:bg-muted/30 transition-colors">
-                              <td className="px-4 py-3 font-medium">{category.name}</td>
-                              <td className="px-4 py-3 text-xl">{category.icon}</td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">
-                                {formatTimestamp(category.deleted_at)}
-                              </td>
-                              <td className="px-4 py-3 text-sm">{getUserDisplayName(category.deleted_by_user, category.deleted_by_name)}</td>
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => restoreCategory(category.id)}
-                                    className="flex items-center gap-1 text-sm text-primary hover:underline"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5" />
-                                    Restore
-                                  </button>
-                                  <button
-                                    onClick={() => prepareHardDeleteCategory(category.id)}
-                                    className="flex items-center gap-1 text-sm text-destructive hover:underline"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                    Hard Delete
-                                  </button>
-                                </div>
-                              </td>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[500px]">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Icon</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Deleted</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Deleted By</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y">
+                            {filteredDeletedCategories.map((category) => (
+                              <tr key={category.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="px-4 py-3 font-medium">{category.name}</td>
+                                <td className="px-4 py-3 text-xl">{category.icon}</td>
+                                <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                                  {formatTimestamp(category.deleted_at)}
+                                </td>
+                                <td className="px-4 py-3 text-sm whitespace-nowrap">{getUserDisplayName(category.deleted_by_user, category.deleted_by_name)}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3 whitespace-nowrap">
+                                    <button
+                                      onClick={() => restoreCategory(category.id)}
+                                      disabled={processingAction === `restore-category-${category.id}`}
+                                      className="flex items-center gap-1 text-sm text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <RotateCcw className={`h-3.5 w-3.5 ${processingAction === `restore-category-${category.id}` ? 'animate-spin' : ''}`} />
+                                      {processingAction === `restore-category-${category.id}` ? 'Restoring...' : 'Restore'}
+                                    </button>
+                                    <button
+                                      onClick={() => prepareHardDeleteCategory(category.id)}
+                                      disabled={processingAction !== null}
+                                      className="flex items-center gap-1 text-sm text-destructive hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Hard Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -3148,10 +3224,11 @@ export default function AdminPanel() {
                                     )}
                                     <button
                                       onClick={() => handleDeleteAdminComment(comment.id)}
-                                      className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                                      disabled={processingAction === `delete-comment-${comment.id}`}
+                                      className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                       title="Delete comment"
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className={`h-4 w-4 ${processingAction === `delete-comment-${comment.id}` ? 'animate-pulse' : ''}`} />
                                     </button>
                                   </div>
                                 </div>
