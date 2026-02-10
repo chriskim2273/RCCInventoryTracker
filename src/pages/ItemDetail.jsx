@@ -967,7 +967,7 @@ export default function ItemDetail() {
           )}
         </div>
 
-        <div className="space-y-3 sm:space-y-4">
+        <div className="order-first lg:order-none space-y-3 sm:space-y-4">
           <div className="bg-card border rounded-lg p-4 sm:p-6">
             <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Quantity</h3>
             <div className="flex items-center justify-between mb-3 sm:mb-4">

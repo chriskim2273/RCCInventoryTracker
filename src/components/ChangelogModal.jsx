@@ -2,11 +2,21 @@ import { Sparkles } from 'lucide-react'
 import Modal from './Modal'
 
 // Update this version when adding new changelog entries
-const CHANGELOG_VERSION = '1.7.5'
+const CHANGELOG_VERSION = '1.7.6'
 const STORAGE_KEY = `changelog_dismissed_v${CHANGELOG_VERSION}`
 
 // Changelog entries - add new versions at the top
 const CHANGELOG_ENTRIES = [
+  {
+    version: '1.7.6',
+    date: '2026-02-09',
+    title: 'Mobile Check-In & Location Path Fixes',
+    changes: [
+      'Check In and Check Out buttons are now easily accessible on mobile devices at the top of the item detail page',
+      'Renaming a location now correctly updates the full path for all child and grandchild locations',
+      'Fixed stale location paths appearing in search results after a location rename',
+    ],
+  },
   {
     version: '1.7.5',
     date: '2026-01-30',
