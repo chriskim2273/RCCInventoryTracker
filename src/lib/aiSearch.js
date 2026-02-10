@@ -7,8 +7,6 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 // List of free models to try (in order of preference)
 const FALLBACK_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
-  'x-ai/grok-4.1-fast:free',
   'openrouter/free',
 ]
 
