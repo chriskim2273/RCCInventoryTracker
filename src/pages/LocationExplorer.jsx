@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 import { ChevronRight, Home, Plus, Minus, Edit, Trash2, List, Search, X } from 'lucide-react'
 import { fuzzySearchItems } from '@/lib/fuzzySearchItems'
 import { useAuth } from '@/contexts/AuthContext'
@@ -9,6 +9,9 @@ import LocationModal from '@/components/LocationModal'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 import RelocationConfirmationModal from '@/components/RelocationConfirmationModal'
 import LocationSearch from '@/components/LocationSearch'
+import Pagination from '@/components/Pagination'
+
+const PAGE_SIZE = 50
 
 export default function LocationExplorer() {
   const { locationId } = useParams()
@@ -41,14 +44,16 @@ export default function LocationExplorer() {
   const [showSearch, setShowSearch] = useState(false)
   const [allLocations, setAllLocations] = useState([])
   const [itemSearchQuery, setItemSearchQuery] = useState('')
-  const [filteredItems, setFilteredItems] = useState([])
   const [showSublocationItems, setShowSublocationItems] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalItemCount, setTotalItemCount] = useState(0)
   const itemSearchRef = useRef(null)
+  const itemsSectionRef = useRef(null)
   const { canEdit, isAdmin, user } = useAuth()
 
   useEffect(() => {
     fetchLocationData()
-  }, [locationId])
+  }, [locationId, currentPage, showSublocationItems])
 
   // Fetch all locations for search functionality
   useEffect(() => {
@@ -90,30 +95,77 @@ export default function LocationExplorer() {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Debounced item search filtering
-  useEffect(() => {
-    if (!itemSearchQuery.trim()) {
-      setFilteredItems(items)
-      return
-    }
-
-    const timer = setTimeout(() => {
-      setFilteredItems(fuzzySearchItems(items, itemSearchQuery))
-    }, 100)
-
-    return () => clearTimeout(timer)
-  }, [itemSearchQuery, items])
-
-  // Reset item search and sublocation filter when navigating to a new location
+  // Reset page when location changes
   useEffect(() => {
     setItemSearchQuery('')
     setShowSublocationItems(true)
+    setCurrentPage(1)
   }, [locationId])
 
-  // Apply sublocation filter on top of search filter
-  const displayedItems = showSublocationItems
-    ? filteredItems
-    : filteredItems.filter(item => item.location_id === locationId)
+  // Reset page when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [itemSearchQuery])
+
+  // Reset page when sublocation toggle changes (handled via dependency in fetchLocationData useEffect)
+  // We need a separate effect to reset the page number
+  const prevShowSublocationItems = useRef(showSublocationItems)
+  useEffect(() => {
+    if (prevShowSublocationItems.current !== showSublocationItems) {
+      setCurrentPage(1)
+      prevShowSublocationItems.current = showSublocationItems
+    }
+  }, [showSublocationItems])
+
+  // Compute displayed items based on mode
+  const displayedItems = useMemo(() => {
+    const isSearchMode = itemSearchQuery.trim()
+
+    if (isSearchMode) {
+      // In search mode, items contains ALL items (fetched via fetchAllRows)
+      // Apply fuzzy search
+      let filtered = fuzzySearchItems(items, itemSearchQuery)
+      // Apply sublocation filter
+      if (!showSublocationItems) {
+        filtered = filtered.filter(item => item.location_id === locationId)
+      }
+      // Paginate in memory
+      const start = (currentPage - 1) * PAGE_SIZE
+      return filtered.slice(start, start + PAGE_SIZE)
+    } else {
+      // In normal mode, items is already the current page from server
+      // But sublocation filter may still apply client-side
+      if (!showSublocationItems) {
+        // When sublocation toggle is off, server query already filters by exact location
+        // so items should already be filtered, but let's be safe
+        return items.filter(item => item.location_id === locationId)
+      }
+      return items
+    }
+  }, [items, itemSearchQuery, showSublocationItems, locationId, currentPage])
+
+  // Compute total for pagination
+  const paginationTotal = useMemo(() => {
+    const isSearchMode = itemSearchQuery.trim()
+    if (isSearchMode) {
+      let filtered = fuzzySearchItems(items, itemSearchQuery)
+      if (!showSublocationItems) {
+        filtered = filtered.filter(item => item.location_id === locationId)
+      }
+      return filtered.length
+    }
+    return totalItemCount
+  }, [items, itemSearchQuery, showSublocationItems, locationId, totalItemCount])
+
+  const totalPages = Math.ceil(paginationTotal / PAGE_SIZE)
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+    // Scroll to top of items section
+    if (itemsSectionRef.current) {
+      itemsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   const handleOpenSearch = useCallback(() => {
     setShowSearch(true)
@@ -227,27 +279,64 @@ export default function LocationExplorer() {
       // Get all sublocation IDs to include items from sublocations
       let locationIdsToQuery = []
       if (locationId) {
-        locationIdsToQuery = await getAllSublocationIds(locationId)
+        if (showSublocationItems) {
+          locationIdsToQuery = await getAllSublocationIds(locationId)
+        } else {
+          locationIdsToQuery = [locationId]
+        }
       }
 
-      let itemsQuery = supabase
-        .from('items')
-        .select(`
-          *,
-          category:categories(name, icon),
-          location:locations(name, path)
-        `)
-        .is('deleted_at', null)
+      const isSearchMode = itemSearchQuery.trim()
 
-      if (locationId) {
-        itemsQuery = itemsQuery.in('location_id', locationIdsToQuery)
+      if (isSearchMode) {
+        // Search mode: fetch ALL items for fuzzy search
+        let itemsQuery = supabase
+          .from('items')
+          .select(`
+            *,
+            category:categories(name, icon),
+            location:locations(name, path)
+          `)
+          .is('deleted_at', null)
+
+        if (locationId) {
+          // In search mode, always fetch from all sublocations so fuzzy search covers everything
+          const allLocationIds = await getAllSublocationIds(locationId)
+          itemsQuery = itemsQuery.in('location_id', allLocationIds)
+        } else {
+          itemsQuery = itemsQuery.is('location_id', null)
+        }
+
+        const { data: itemsData } = await fetchAllRows(itemsQuery.order('name'))
+        setItems(itemsData || [])
+        setTotalItemCount((itemsData || []).length)
       } else {
-        itemsQuery = itemsQuery.is('location_id', null)
+        // Normal mode: server-side pagination
+        let itemsQuery = supabase
+          .from('items')
+          .select(`
+            *,
+            category:categories(name, icon),
+            location:locations(name, path)
+          `, { count: 'exact' })
+          .is('deleted_at', null)
+
+        if (locationId) {
+          itemsQuery = itemsQuery.in('location_id', locationIdsToQuery)
+        } else {
+          itemsQuery = itemsQuery.is('location_id', null)
+        }
+
+        const from = (currentPage - 1) * PAGE_SIZE
+        const to = currentPage * PAGE_SIZE - 1
+
+        const { data: itemsData, count } = await itemsQuery
+          .order('name')
+          .range(from, to)
+
+        setItems(itemsData || [])
+        setTotalItemCount(count || 0)
       }
-
-      const { data: itemsData } = await itemsQuery.order('name')
-
-      setItems(itemsData || [])
     } catch (error) {
       console.error('Error fetching location data:', error)
     } finally {
@@ -691,7 +780,7 @@ export default function LocationExplorer() {
           )}
 
           {locationId && (
-            <div>
+            <div ref={itemsSectionRef}>
               <div className="flex flex-col gap-3 mb-3 sm:mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -744,7 +833,7 @@ export default function LocationExplorer() {
                 </div>
 
                 {/* Item Search Bar */}
-                {items.length > 0 && (
+                {(paginationTotal > 0 || itemSearchQuery) && (
                   <div className="relative max-w-sm">
                     <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors ${itemSearchQuery ? 'text-primary' : 'text-muted-foreground'}`} />
                     <input
@@ -768,26 +857,30 @@ export default function LocationExplorer() {
                 )}
 
                 {/* Results count indicator */}
-                {(itemSearchQuery || !showSublocationItems) && items.length > 0 && (
+                {(itemSearchQuery || !showSublocationItems) && paginationTotal > 0 && (
                   <div className="text-sm text-muted-foreground">
-                    Showing {displayedItems.length} of {items.length} item{items.length !== 1 ? 's' : ''}
+                    Showing {displayedItems.length} of {paginationTotal} item{paginationTotal !== 1 ? 's' : ''}
                     {!showSublocationItems && <span className="ml-1">(this location only)</span>}
-                    {displayedItems.length === 0 && (
-                      <button
-                        onClick={() => {
-                          setItemSearchQuery('')
-                          setShowSublocationItems(true)
-                        }}
-                        className="ml-2 text-primary hover:underline"
-                      >
-                        Clear filters
-                      </button>
-                    )}
+                  </div>
+                )}
+                {(itemSearchQuery || !showSublocationItems) && paginationTotal === 0 && totalItemCount > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    Showing 0 of {totalItemCount} item{totalItemCount !== 1 ? 's' : ''}
+                    {!showSublocationItems && <span className="ml-1">(this location only)</span>}
+                    <button
+                      onClick={() => {
+                        setItemSearchQuery('')
+                        setShowSublocationItems(true)
+                      }}
+                      className="ml-2 text-primary hover:underline"
+                    >
+                      Clear filters
+                    </button>
                   </div>
                 )}
               </div>
 
-              {items.length === 0 ? (
+              {totalItemCount === 0 && !itemSearchQuery ? (
                 <div className="text-center py-8 text-sm text-muted-foreground border rounded-lg">
                   No items at this location
                 </div>
@@ -813,79 +906,88 @@ export default function LocationExplorer() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  {displayedItems.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={`/items/${item.id}`}
-                      state={{ from: location.pathname }}
-                      draggable={canEdit}
-                      onDragStart={(e) => canEdit && handleDragStart(e, item)}
-                      onDragEnd={handleDragEnd}
-                      className={`bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative ${draggedItemId === item.id ? 'opacity-50' : ''
-                        }`}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-base truncate">{item.name}</h3>
-                          {item.serial_number && (
-                            <p className="text-xs text-muted-foreground truncate">SN: {item.serial_number}</p>
-                          )}
-                          <p className="text-xs sm:text-sm text-muted-foreground">
-                            {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
-                            {item.category?.name || 'Uncategorized'}
-                          </p>
-                          {item.location?.path && item.location_id !== locationId && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate" title={item.location.path}>
-                              📍 {item.location.path}
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                    {displayedItems.map((item) => (
+                      <Link
+                        key={item.id}
+                        to={`/items/${item.id}`}
+                        state={{ from: location.pathname }}
+                        draggable={canEdit}
+                        onDragStart={(e) => canEdit && handleDragStart(e, item)}
+                        onDragEnd={handleDragEnd}
+                        className={`bg-card border rounded-lg p-4 hover:border-primary transition-colors group relative ${draggedItemId === item.id ? 'opacity-50' : ''
+                          }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-base truncate">{item.name}</h3>
+                            {item.serial_number && (
+                              <p className="text-xs text-muted-foreground truncate">SN: {item.serial_number}</p>
+                            )}
+                            <p className="text-xs sm:text-sm text-muted-foreground">
+                              {item.category?.icon && <span className="mr-1">{item.category.icon}</span>}
+                              {item.category?.name || 'Uncategorized'}
                             </p>
+                            {item.location?.path && item.location_id !== locationId && (
+                              <p className="text-xs text-muted-foreground mt-1 truncate" title={item.location.path}>
+                                📍 {item.location.path}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          {editingItemId === item.id ? (
+                            <input
+                              type="number"
+                              min="0"
+                              value={quantityInput}
+                              onChange={(e) => setQuantityInput(e.target.value)}
+                              onBlur={(e) => saveQuantity(item.id, e)}
+                              onKeyDown={(e) => handleQuantityKeyDown(item.id, e)}
+                              onClick={(e) => e.stopPropagation()}
+                              autoFocus
+                              className="text-sm font-medium w-20 px-2 py-1 border rounded-md bg-background"
+                            />
+                          ) : (
+                            <span
+                              onClick={(e) => canEdit ? startEditingQuantity(item, e) : null}
+                              className={`text-xs sm:text-sm font-medium ${canEdit ? 'cursor-pointer hover:text-primary transition-colors' : 'text-muted-foreground'}`}
+                              title={canEdit ? 'Click to edit quantity' : ''}
+                            >
+                              Qty: {item.quantity}
+                            </span>
+                          )}
+                          {canEdit && editingItemId !== item.id && (
+                            <div className="flex items-center gap-1 sm:gap-2">
+                              <button
+                                onClick={(e) => handleQuantityChange(item.id, -1, e)}
+                                className="p-2 sm:p-2.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 border border-red-300 dark:border-red-800 rounded-md transition-colors"
+                                title="Decrease quantity"
+                              >
+                                <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
+                              </button>
+                              <button
+                                onClick={(e) => handleQuantityChange(item.id, 1, e)}
+                                className="p-2 sm:p-2.5 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-300 border border-green-300 dark:border-green-800 rounded-md transition-colors"
+                                title="Increase quantity"
+                              >
+                                <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
+                              </button>
+                            </div>
                           )}
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        {editingItemId === item.id ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={quantityInput}
-                            onChange={(e) => setQuantityInput(e.target.value)}
-                            onBlur={(e) => saveQuantity(item.id, e)}
-                            onKeyDown={(e) => handleQuantityKeyDown(item.id, e)}
-                            onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                            className="text-sm font-medium w-20 px-2 py-1 border rounded-md bg-background"
-                          />
-                        ) : (
-                          <span
-                            onClick={(e) => canEdit ? startEditingQuantity(item, e) : null}
-                            className={`text-xs sm:text-sm font-medium ${canEdit ? 'cursor-pointer hover:text-primary transition-colors' : 'text-muted-foreground'}`}
-                            title={canEdit ? 'Click to edit quantity' : ''}
-                          >
-                            Qty: {item.quantity}
-                          </span>
-                        )}
-                        {canEdit && editingItemId !== item.id && (
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <button
-                              onClick={(e) => handleQuantityChange(item.id, -1, e)}
-                              className="p-2 sm:p-2.5 bg-red-100 hover:bg-red-200 text-red-700 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-300 border border-red-300 dark:border-red-800 rounded-md transition-colors"
-                              title="Decrease quantity"
-                            >
-                              <Minus className="h-4 w-4 sm:h-5 sm:w-5" />
-                            </button>
-                            <button
-                              onClick={(e) => handleQuantityChange(item.id, 1, e)}
-                              className="p-2 sm:p-2.5 bg-green-100 hover:bg-green-200 text-green-700 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-300 border border-green-300 dark:border-green-800 rounded-md transition-colors"
-                              title="Increase quantity"
-                            >
-                              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={paginationTotal}
+                    pageSize={PAGE_SIZE}
+                    onPageChange={handlePageChange}
+                  />
+                </>
               )}
             </div>
           )}
