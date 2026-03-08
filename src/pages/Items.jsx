@@ -413,8 +413,8 @@ export default function Items() {
   useEffect(() => {
     if (!isClientSideMode) {
       // In server mode, items are already the correct page
+      // totalCount is set by fetchServerSide with the correct server count
       setFilteredItems(items)
-      setTotalCount(items.length) // This gets overridden by server count in server mode
       return
     }
 

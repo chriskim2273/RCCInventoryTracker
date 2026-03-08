@@ -119,7 +119,9 @@ export default function AdminPanel() {
   const [checkoutStatusFilter, setCheckoutStatusFilter] = useState('all')
   const [checkoutPerformedByFilter, setCheckoutPerformedByFilter] = useState('all')
 
-  const [deletedPage, setDeletedPage] = useState(1)
+  const [deletedItemsPage, setDeletedItemsPage] = useState(1)
+  const [deletedLocationsPage, setDeletedLocationsPage] = useState(1)
+  const [deletedCategoriesPage, setDeletedCategoriesPage] = useState(1)
   const [checkoutPage, setCheckoutPage] = useState(1)
   const [commentsPage, setCommentsPage] = useState(1)
 
@@ -470,10 +472,9 @@ export default function AdminPanel() {
   }, [adminComments])
 
   // Paginated slices for client-side pagination
-  const paginatedDeletedItems = filteredDeletedItems.slice((deletedPage - 1) * TAB_PAGE_SIZE, deletedPage * TAB_PAGE_SIZE)
-  const paginatedDeletedLocations = filteredDeletedLocations.slice((deletedPage - 1) * TAB_PAGE_SIZE, deletedPage * TAB_PAGE_SIZE)
-  const paginatedDeletedCategories = filteredDeletedCategories.slice((deletedPage - 1) * TAB_PAGE_SIZE, deletedPage * TAB_PAGE_SIZE)
-  const allFilteredDeletedCount = filteredDeletedItems.length + filteredDeletedLocations.length + filteredDeletedCategories.length
+  const paginatedDeletedItems = filteredDeletedItems.slice((deletedItemsPage - 1) * TAB_PAGE_SIZE, deletedItemsPage * TAB_PAGE_SIZE)
+  const paginatedDeletedLocations = filteredDeletedLocations.slice((deletedLocationsPage - 1) * TAB_PAGE_SIZE, deletedLocationsPage * TAB_PAGE_SIZE)
+  const paginatedDeletedCategories = filteredDeletedCategories.slice((deletedCategoriesPage - 1) * TAB_PAGE_SIZE, deletedCategoriesPage * TAB_PAGE_SIZE)
   const paginatedCheckoutHistory = filteredCheckoutHistory.slice((checkoutPage - 1) * TAB_PAGE_SIZE, checkoutPage * TAB_PAGE_SIZE)
   const paginatedAdminComments = filteredAdminCommentsItems.slice((commentsPage - 1) * TAB_PAGE_SIZE, commentsPage * TAB_PAGE_SIZE)
 
@@ -524,7 +525,7 @@ export default function AdminPanel() {
   }, [adminAuditStartDate, adminAuditEndDate])
 
   // Reset client-side pagination pages when filters change
-  useEffect(() => { setDeletedPage(1) }, [deletedSearchQuery, deletedTypeFilter, deletedUserFilter])
+  useEffect(() => { setDeletedItemsPage(1); setDeletedLocationsPage(1); setDeletedCategoriesPage(1) }, [deletedSearchQuery, deletedTypeFilter, deletedUserFilter])
   useEffect(() => { setCheckoutPage(1) }, [checkoutSearchQuery, checkoutStatusFilter, checkoutPerformedByFilter])
   useEffect(() => { setCommentsPage(1) }, [adminCommentsSearchQuery, adminCommentsStatusFilter, adminCommentsUserFilter])
 
@@ -2654,6 +2655,13 @@ export default function AdminPanel() {
                       </div>
                     </div>
                   )}
+                  <Pagination
+                    currentPage={deletedItemsPage}
+                    totalPages={Math.ceil(filteredDeletedItems.length / TAB_PAGE_SIZE)}
+                    totalItems={filteredDeletedItems.length}
+                    pageSize={TAB_PAGE_SIZE}
+                    onPageChange={setDeletedItemsPage}
+                  />
                 </div>
               )}
 
@@ -2718,6 +2726,13 @@ export default function AdminPanel() {
                       </div>
                     </div>
                   )}
+                  <Pagination
+                    currentPage={deletedLocationsPage}
+                    totalPages={Math.ceil(filteredDeletedLocations.length / TAB_PAGE_SIZE)}
+                    totalItems={filteredDeletedLocations.length}
+                    pageSize={TAB_PAGE_SIZE}
+                    onPageChange={setDeletedLocationsPage}
+                  />
                 </div>
               )}
 
@@ -2778,16 +2793,15 @@ export default function AdminPanel() {
                       </div>
                     </div>
                   )}
+                  <Pagination
+                    currentPage={deletedCategoriesPage}
+                    totalPages={Math.ceil(filteredDeletedCategories.length / TAB_PAGE_SIZE)}
+                    totalItems={filteredDeletedCategories.length}
+                    pageSize={TAB_PAGE_SIZE}
+                    onPageChange={setDeletedCategoriesPage}
+                  />
                 </div>
               )}
-
-              <Pagination
-                currentPage={deletedPage}
-                totalPages={Math.ceil(allFilteredDeletedCount / TAB_PAGE_SIZE)}
-                totalItems={allFilteredDeletedCount}
-                pageSize={TAB_PAGE_SIZE}
-                onPageChange={setDeletedPage}
-              />
             </div>
           )}
 
