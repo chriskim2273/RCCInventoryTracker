@@ -11,8 +11,10 @@ import HardDeleteConfirmationModal from '@/components/HardDeleteConfirmationModa
 import RoleChangeConfirmationModal from '@/components/RoleChangeConfirmationModal'
 import { useAuth } from '@/contexts/AuthContext'
 import { getUserDetails, deleteUser, resendConfirmationEmail, resetUserPassword } from '@/lib/adminApi'
+import Pagination from '@/components/Pagination'
 
 const VALID_TABS = ['users', 'categories', 'audit', 'admin-audit', 'deleted', 'checkout-history', 'admin-comments', 'settings']
+const TAB_PAGE_SIZE = 50
 
 export default function AdminPanel() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -116,6 +118,10 @@ export default function AdminPanel() {
   const [checkoutSearchQuery, setCheckoutSearchQuery] = useState('')
   const [checkoutStatusFilter, setCheckoutStatusFilter] = useState('all')
   const [checkoutPerformedByFilter, setCheckoutPerformedByFilter] = useState('all')
+
+  const [deletedPage, setDeletedPage] = useState(1)
+  const [checkoutPage, setCheckoutPage] = useState(1)
+  const [commentsPage, setCommentsPage] = useState(1)
 
   const [userSearchQuery, setUserSearchQuery] = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('all')
@@ -463,6 +469,14 @@ export default function AdminPanel() {
     return { total, unresolved, resolved }
   }, [adminComments])
 
+  // Paginated slices for client-side pagination
+  const paginatedDeletedItems = filteredDeletedItems.slice((deletedPage - 1) * TAB_PAGE_SIZE, deletedPage * TAB_PAGE_SIZE)
+  const paginatedDeletedLocations = filteredDeletedLocations.slice((deletedPage - 1) * TAB_PAGE_SIZE, deletedPage * TAB_PAGE_SIZE)
+  const paginatedDeletedCategories = filteredDeletedCategories.slice((deletedPage - 1) * TAB_PAGE_SIZE, deletedPage * TAB_PAGE_SIZE)
+  const allFilteredDeletedCount = filteredDeletedItems.length + filteredDeletedLocations.length + filteredDeletedCategories.length
+  const paginatedCheckoutHistory = filteredCheckoutHistory.slice((checkoutPage - 1) * TAB_PAGE_SIZE, checkoutPage * TAB_PAGE_SIZE)
+  const paginatedAdminComments = filteredAdminCommentsItems.slice((commentsPage - 1) * TAB_PAGE_SIZE, commentsPage * TAB_PAGE_SIZE)
+
   useEffect(() => {
     fetchData()
   }, [activeTab])
@@ -508,6 +522,11 @@ export default function AdminPanel() {
       setAdminAuditPage(1)
     }
   }, [adminAuditStartDate, adminAuditEndDate])
+
+  // Reset client-side pagination pages when filters change
+  useEffect(() => { setDeletedPage(1) }, [deletedSearchQuery, deletedTypeFilter, deletedUserFilter])
+  useEffect(() => { setCheckoutPage(1) }, [checkoutSearchQuery, checkoutStatusFilter, checkoutPerformedByFilter])
+  useEffect(() => { setCommentsPage(1) }, [adminCommentsSearchQuery, adminCommentsStatusFilter, adminCommentsUserFilter])
 
   // Fetch current user's notification preferences on mount
   useEffect(() => {
@@ -2028,44 +2047,14 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              {/* Pagination Info & Controls */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  {auditTotalCount === 0 ? (
-                    'No logs found'
-                  ) : (
-                    <>
-                      Showing {Math.min((auditPage - 1) * AUDIT_PAGE_SIZE + 1, auditTotalCount)}-{Math.min(auditPage * AUDIT_PAGE_SIZE, auditTotalCount)} of {auditTotalCount} logs
-                      {auditTotalCount > AUDIT_PAGE_SIZE && (
-                        <span className="ml-1">(Page {auditPage} of {Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)})</span>
-                      )}
-                    </>
-                  )}
-                </p>
 
-                {auditTotalCount > AUDIT_PAGE_SIZE && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setAuditPage(p => Math.max(1, p - 1))}
-                      disabled={auditPage === 1}
-                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-sm text-muted-foreground px-2">
-                      {auditPage} / {Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)}
-                    </span>
-                    <button
-                      onClick={() => setAuditPage(p => p + 1)}
-                      disabled={auditPage >= Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)}
-                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
-
+              <Pagination
+                currentPage={auditPage}
+                totalPages={Math.ceil(auditTotalCount / AUDIT_PAGE_SIZE)}
+                totalItems={auditTotalCount}
+                pageSize={AUDIT_PAGE_SIZE}
+                onPageChange={setAuditPage}
+              />
               {/* Results */}
               {filteredAuditLogs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
@@ -2348,44 +2337,14 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              {/* Pagination Info & Controls */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">
-                  {adminAuditTotalCount === 0 ? (
-                    'No logs found'
-                  ) : (
-                    <>
-                      Showing {Math.min((adminAuditPage - 1) * ADMIN_AUDIT_PAGE_SIZE + 1, adminAuditTotalCount)}-{Math.min(adminAuditPage * ADMIN_AUDIT_PAGE_SIZE, adminAuditTotalCount)} of {adminAuditTotalCount} logs
-                      {adminAuditTotalCount > ADMIN_AUDIT_PAGE_SIZE && (
-                        <span className="ml-1">(Page {adminAuditPage} of {Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)})</span>
-                      )}
-                    </>
-                  )}
-                </p>
 
-                {adminAuditTotalCount > ADMIN_AUDIT_PAGE_SIZE && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setAdminAuditPage(p => Math.max(1, p - 1))}
-                      disabled={adminAuditPage === 1}
-                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-sm text-muted-foreground px-2">
-                      {adminAuditPage} / {Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)}
-                    </span>
-                    <button
-                      onClick={() => setAdminAuditPage(p => p + 1)}
-                      disabled={adminAuditPage >= Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)}
-                      className="px-3 py-1.5 text-sm border rounded-md bg-background hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
-
+              <Pagination
+                currentPage={adminAuditPage}
+                totalPages={Math.ceil(adminAuditTotalCount / ADMIN_AUDIT_PAGE_SIZE)}
+                totalItems={adminAuditTotalCount}
+                pageSize={ADMIN_AUDIT_PAGE_SIZE}
+                onPageChange={setAdminAuditPage}
+              />
               {/* Results */}
               {filteredAdminAuditLogs.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
@@ -2624,7 +2583,7 @@ export default function AdminPanel() {
               {(deletedTypeFilter === 'all' || deletedTypeFilter === 'items') && (
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Deleted Items ({filteredDeletedItems.length})</h2>
-                  {filteredDeletedItems.length === 0 ? (
+                  {paginatedDeletedItems.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
                       {deletedItems.length === 0 ? 'No deleted items' : 'No items match your filters'}
                     </div>
@@ -2643,7 +2602,7 @@ export default function AdminPanel() {
                             </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {filteredDeletedItems.map((item) => (
+                            {paginatedDeletedItems.map((item) => (
                               <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                                 <td className="px-4 py-3">
                                   <Link to={`/items/${item.id}`} className="font-medium text-primary hover:underline">
@@ -2702,7 +2661,7 @@ export default function AdminPanel() {
               {(deletedTypeFilter === 'all' || deletedTypeFilter === 'locations') && (
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Deleted Locations ({filteredDeletedLocations.length})</h2>
-                  {filteredDeletedLocations.length === 0 ? (
+                  {paginatedDeletedLocations.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
                       {deletedLocations.length === 0 ? 'No deleted locations' : 'No locations match your filters'}
                     </div>
@@ -2720,7 +2679,7 @@ export default function AdminPanel() {
                             </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {filteredDeletedLocations.map((location) => (
+                            {paginatedDeletedLocations.map((location) => (
                               <tr key={location.id} className="hover:bg-muted/30 transition-colors">
                                 <td className="px-4 py-3">
                                   <Link to={`/locations/${location.id}`} className="font-medium text-primary hover:underline">
@@ -2766,7 +2725,7 @@ export default function AdminPanel() {
               {(deletedTypeFilter === 'all' || deletedTypeFilter === 'categories') && (
                 <div>
                   <h2 className="text-xl font-semibold mb-4">Deleted Categories ({filteredDeletedCategories.length})</h2>
-                  {filteredDeletedCategories.length === 0 ? (
+                  {paginatedDeletedCategories.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground bg-card border rounded-lg">
                       {deletedCategories.length === 0 ? 'No deleted categories' : 'No categories match your filters'}
                     </div>
@@ -2784,7 +2743,7 @@ export default function AdminPanel() {
                             </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {filteredDeletedCategories.map((category) => (
+                            {paginatedDeletedCategories.map((category) => (
                               <tr key={category.id} className="hover:bg-muted/30 transition-colors">
                                 <td className="px-4 py-3 font-medium">{category.name}</td>
                                 <td className="px-4 py-3 text-xl">{category.icon}</td>
@@ -2821,6 +2780,14 @@ export default function AdminPanel() {
                   )}
                 </div>
               )}
+
+              <Pagination
+                currentPage={deletedPage}
+                totalPages={Math.ceil(allFilteredDeletedCount / TAB_PAGE_SIZE)}
+                totalItems={allFilteredDeletedCount}
+                pageSize={TAB_PAGE_SIZE}
+                onPageChange={setDeletedPage}
+              />
             </div>
           )}
 
@@ -2927,7 +2894,7 @@ export default function AdminPanel() {
               </div>
 
               {/* Results */}
-              {filteredCheckoutHistory.length === 0 ? (
+              {paginatedCheckoutHistory.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
                   {checkoutHistory.length === 0 ? 'No checkout history yet' : 'No checkouts match your filters'}
                 </div>
@@ -2952,7 +2919,7 @@ export default function AdminPanel() {
                         </tr>
                       </thead>
                       <tbody className="divide-y">
-                        {filteredCheckoutHistory.map((log) => {
+                        {paginatedCheckoutHistory.map((log) => {
                           const isActive = !log.checked_in_at
                           const isPartialReturn = log.quantity_checked_in && log.quantity_checked_in < log.quantity_checked_out
 
@@ -3045,6 +3012,14 @@ export default function AdminPanel() {
                   </div>
                 </div>
               )}
+
+              <Pagination
+                currentPage={checkoutPage}
+                totalPages={Math.ceil(filteredCheckoutHistory.length / TAB_PAGE_SIZE)}
+                totalItems={filteredCheckoutHistory.length}
+                pageSize={TAB_PAGE_SIZE}
+                onPageChange={setCheckoutPage}
+              />
             </div>
           )}
 
@@ -3136,13 +3111,13 @@ export default function AdminPanel() {
               </div>
 
               {/* Comments grouped by item */}
-              {filteredAdminCommentsItems.length === 0 ? (
+              {paginatedAdminComments.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground bg-card border rounded-lg">
                   {adminComments.length === 0 ? 'No admin comments yet' : 'No comments match your filters'}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredAdminCommentsItems.map(([itemId, data]) => {
+                  {paginatedAdminComments.map(([itemId, data]) => {
                     const unresolvedCount = data.comments.filter(c => !c.resolved_at).length
                     const isExpanded = expandedCommentItems.has(itemId)
 
@@ -3249,6 +3224,14 @@ export default function AdminPanel() {
                   })}
                 </div>
               )}
+
+              <Pagination
+                currentPage={commentsPage}
+                totalPages={Math.ceil(filteredAdminCommentsItems.length / TAB_PAGE_SIZE)}
+                totalItems={filteredAdminCommentsItems.length}
+                pageSize={TAB_PAGE_SIZE}
+                onPageChange={setCommentsPage}
+              />
             </div>
           )}
 
