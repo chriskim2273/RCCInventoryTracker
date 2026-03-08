@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 import { Package, MapPin, Users, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import TreeView from '@/components/TreeView'
@@ -28,15 +28,17 @@ export default function Dashboard() {
 
     try {
       const [itemsResult, locationsResult, locationsData, checkoutLogsResult] = await Promise.all([
-        supabase
-          .from('items')
-          .select(`
-            *,
-            category:categories(name, icon),
-            location:locations(name, path)
-          `)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false }),
+        fetchAllRows(
+          supabase
+            .from('items')
+            .select(`
+              *,
+              category:categories(name, icon),
+              location:locations(name, path)
+            `)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+        ),
         supabase.from('locations').select('id', { count: 'exact', head: true }).is('deleted_at', null),
         supabase.from('locations').select('*').is('deleted_at', null).order('path'),
         supabase

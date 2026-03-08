@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 import { AlertTriangle, Package, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import ReorderRequestModal from './ReorderRequestModal'
@@ -21,15 +21,17 @@ export default function LowQuantityItems() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('items')
-        .select(`
-          *,
-          category:categories(name, icon),
-          location:locations(name, path)
-        `)
-        .is('deleted_at', null)
-        .not('min_quantity', 'is', null)
+      const { data, error } = await fetchAllRows(
+        supabase
+          .from('items')
+          .select(`
+            *,
+            category:categories(name, icon),
+            location:locations(name, path)
+          `)
+          .is('deleted_at', null)
+          .not('min_quantity', 'is', null)
+      )
 
       if (error) throw error
 

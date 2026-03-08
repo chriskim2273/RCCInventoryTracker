@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 import { formatDate as utilsFormatDate, formatTimestamp as utilsFormatTimestamp, parseTimestamp } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import Modal from './Modal'
@@ -207,7 +207,7 @@ export default function ReorderRequestModal({
 
   const fetchOptions = async () => {
     const [itemsRes, categoriesRes, locationsRes, usersRes] = await Promise.all([
-      supabase.from('items').select('id, name, brand, model, category_id, order_link, location_id').is('deleted_at', null).order('name'),
+      fetchAllRows(supabase.from('items').select('id, name, brand, model, category_id, order_link, location_id').is('deleted_at', null).order('name')),
       supabase.from('categories').select('*').is('deleted_at', null).order('name'),
       supabase.from('locations').select('*').is('deleted_at', null).order('path'),
       supabase.from('users').select('*').eq('role', 'admin').order('first_name, last_name, email'),
