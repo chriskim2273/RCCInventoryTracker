@@ -2,11 +2,24 @@ import { Sparkles } from 'lucide-react'
 import Modal from './Modal'
 
 // Update this version when adding new changelog entries
-const CHANGELOG_VERSION = '1.7.6'
+const CHANGELOG_VERSION = '1.8.0'
 const STORAGE_KEY = `changelog_dismissed_v${CHANGELOG_VERSION}`
 
 // Changelog entries - add new versions at the top
 const CHANGELOG_ENTRIES = [
+  {
+    version: '1.8.0',
+    date: '2026-03-08',
+    title: 'Pagination',
+    changes: [
+      'All item lists now load 50 items per page with page navigation controls, improving performance for large inventories',
+      'Items page uses server-side pagination for fast browsing, with automatic client-side fallback when using fuzzy search or AI search',
+      'Location Explorer items are now paginated with server-side queries',
+      'Reorder Requests page now paginates results across all filters and sorting',
+      'Admin Panel deleted items, checkout history, and admin comments tabs now paginate their lists',
+      'Inventory no longer stops at 1,000 items — all records are accessible via pagination',
+    ],
+  },
   {
     version: '1.7.6',
     date: '2026-02-09',
