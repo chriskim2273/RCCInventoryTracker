@@ -1,4 +1,5 @@
-import { Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import Modal from './Modal'
 
 // Update this version when adding new changelog entries
@@ -44,27 +45,51 @@ const CHANGELOG_ENTRIES = [
   },
 ]
 
+const ChangelogEntry = ({ entry }) => (
+  <div className="space-y-3">
+    <div className="flex items-center gap-2">
+      <Sparkles className="h-5 w-5 text-primary" />
+      <span className="font-semibold">Version {entry.version}</span>
+      <span className="text-sm text-muted-foreground">({entry.date})</span>
+    </div>
+    {entry.title && (
+      <h3 className="font-medium text-lg">{entry.title}</h3>
+    )}
+    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+      {entry.changes.map((change, idx) => (
+        <li key={idx}>{change}</li>
+      ))}
+    </ul>
+  </div>
+)
+
 export default function ChangelogModal({ isOpen, onClose }) {
+  const [showHistory, setShowHistory] = useState(false)
+  const [latest, ...older] = CHANGELOG_ENTRIES
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="What's New" size="md">
       <div className="space-y-6">
-        {CHANGELOG_ENTRIES.map((entry) => (
-          <div key={entry.version} className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Version {entry.version}</span>
-              <span className="text-sm text-muted-foreground">({entry.date})</span>
-            </div>
-            {entry.title && (
-              <h3 className="font-medium text-lg">{entry.title}</h3>
+        <ChangelogEntry entry={latest} />
+
+        {older.length > 0 && (
+          <div className="border-t pt-4">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showHistory ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              Previous updates ({older.length})
+            </button>
+            {showHistory && (
+              <div className="space-y-6 mt-4">
+                {older.map((entry) => (
+                  <ChangelogEntry key={entry.version} entry={entry} />
+                ))}
+              </div>
             )}
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-              {entry.changes.map((change, idx) => (
-                <li key={idx}>{change}</li>
-              ))}
-            </ul>
           </div>
-        ))}
+        )}
 
         <div className="flex justify-end pt-4 border-t">
           <button
