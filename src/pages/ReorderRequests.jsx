@@ -4,7 +4,10 @@ import { formatDate as utilsFormatDate } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { Plus, Search, ExternalLink, Package, ChevronUp, ChevronDown } from 'lucide-react'
 import ReorderRequestModal from '@/components/ReorderRequestModal'
+import Pagination from '@/components/Pagination'
 import Fuse from 'fuse.js'
+
+const PAGE_SIZE = 50
 
 const STATUS_CONFIG = {
   new_request: { label: 'New Request', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200', order: 1 },
@@ -251,6 +254,7 @@ export default function ReorderRequests() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Filter state
   const [selectedStatus, setSelectedStatus] = useState('')
@@ -262,6 +266,11 @@ export default function ReorderRequests() {
 
   // Sort state
   const [sortDirection, setSortDirection] = useState('asc') // 'asc' or 'desc'
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedStatus, selectedPriority, selectedCategory, selectedLocation, sortDirection])
 
   useEffect(() => {
     fetchRequests()
@@ -431,6 +440,12 @@ export default function ReorderRequests() {
     setShowModal(false)
     setSelectedRequest(null)
   }
+
+  // Compute paginated results
+  const paginatedRequests = filteredRequests.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  )
 
   if (loading) {
     return (
@@ -607,7 +622,7 @@ export default function ReorderRequests() {
         <>
           {/* Mobile View */}
           <div className="lg:hidden space-y-3">
-            {filteredRequests.map((request) => (
+            {paginatedRequests.map((request) => (
               <MobileRequestCard
                 key={request.id}
                 request={request}
@@ -635,7 +650,7 @@ export default function ReorderRequests() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredRequests.map((request) => (
+                {paginatedRequests.map((request) => (
                   <DesktopRequestRow
                     key={request.id}
                     request={request}
@@ -645,6 +660,17 @@ export default function ReorderRequests() {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(filteredRequests.length / PAGE_SIZE)}
+            totalItems={filteredRequests.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={(page) => {
+              setCurrentPage(page)
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+          />
         </>
       )}
 
