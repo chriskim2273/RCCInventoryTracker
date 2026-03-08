@@ -232,141 +232,16 @@ export default function Items() {
   // Compute which items to display on the current page
   const displayItems = useMemo(() => {
     if (isClientSideMode) {
-      // Client-side pagination: slice filteredItems
       const start = (currentPage - 1) * PAGE_SIZE
       return filteredItems.slice(start, start + PAGE_SIZE)
     }
-    // Server-side mode: items state IS the current page
     return items
   }, [isClientSideMode, currentPage, filteredItems, items])
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
 
-  // Fetch reference data (categories, locations, checkout logs) - these are always needed
-  const fetchReferenceData = async () => {
-    const [categoriesResult, locationsData, checkoutLogsResult] = await Promise.all([
-      supabase.from('categories').select('*').is('deleted_at', null).order('name'),
-      supabase.from('locations').select('*').is('deleted_at', null).order('path'),
-      supabase
-        .from('checkout_logs')
-        .select('*')
-        .is('checked_in_at', null),
-    ])
-
-    if (categoriesResult.data) setCategories(categoriesResult.data)
-    if (locationsData.data) setLocations(locationsData.data)
-
-    // Build checkout map
-    const checkoutsByItem = {}
-    if (checkoutLogsResult.data) {
-      checkoutLogsResult.data.forEach(log => {
-        if (!checkoutsByItem[log.item_id]) {
-          checkoutsByItem[log.item_id] = []
-        }
-        checkoutsByItem[log.item_id].push(log)
-      })
-    }
-
-    return { categories: categoriesResult.data, locations: locationsData.data, checkoutsByItem }
-  }
-
-  // Enrich items with availability data from checkout logs
-  const enrichItemsWithAvailability = async (itemsData, checkoutsByItem) => {
-    return Promise.all(
-      itemsData.map(async (item) => {
-        const activeCheckouts = checkoutsByItem[item.id] || []
-        const availability = await calculateItemAvailability(item, activeCheckouts)
-        return { ...item, ...availability }
-      })
-    )
-  }
-
-  // Server-side paginated fetch
-  const fetchServerSide = async (page, checkoutsByItem, resolvedSublocationIds) => {
-    let query = supabase
-      .from('items')
-      .select(`
-        *,
-        category:categories(name, icon),
-        location:locations(name, path)
-      `, { count: 'exact' })
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-
-    // Apply server-side filters
-    if (selectedCategory) {
-      query = query.eq('category_id', selectedCategory)
-    }
-
-    if (selectedLocation && resolvedSublocationIds.length > 0) {
-      query = query.in('location_id', resolvedSublocationIds)
-    }
-
-    // Apply range for pagination
-    const from = (page - 1) * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
-    query = query.range(from, to)
-
-    const { data, count, error } = await query
-
-    if (error) {
-      console.error('Error fetching items:', error)
-      return
-    }
-
-    const enriched = await enrichItemsWithAvailability(data || [], checkoutsByItem)
-    setItems(enriched)
-    setTotalCount(count || 0)
-  }
-
-  // Client-side full fetch (for search/status filters)
-  const fetchClientSide = async (checkoutsByItem) => {
-    const itemsResult = await fetchAllRows(
-      supabase
-        .from('items')
-        .select(`
-          *,
-          category:categories(name, icon),
-          location:locations(name, path)
-        `)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-    )
-
-    if (itemsResult.data) {
-      const enriched = await enrichItemsWithAvailability(itemsResult.data, checkoutsByItem)
-      setItems(enriched)
-    }
-  }
-
-  // Main data fetch function
-  const fetchData = useCallback(async (options = {}) => {
-    const { skipLoading = false } = options
-    if (!skipLoading) setLoading(true)
-
-    try {
-      const { checkoutsByItem } = await fetchReferenceData()
-
-      if (isClientSideMode) {
-        await fetchClientSide(checkoutsByItem)
-      } else {
-        // Resolve sublocation IDs synchronously from current locations state
-        let resolvedSublocationIds = sublocationIds
-        if (selectedLocation && sublocationIds.length === 0) {
-          // sublocationIds might not be ready yet, compute inline
-          resolvedSublocationIds = computeSublocationIds(selectedLocation, locations)
-        }
-        await fetchServerSide(currentPage, checkoutsByItem, resolvedSublocationIds)
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [isClientSideMode, currentPage, selectedCategory, selectedLocation, sublocationIds])
-
   // Compute sublocation IDs synchronously from locations array
-  const computeSublocationIds = (locationId, locationsList) => {
+  const computeSublocationIds = useCallback((locationId, locationsList) => {
     const allIds = [locationId]
     const queue = [locationId]
     while (queue.length > 0) {
@@ -380,12 +255,102 @@ export default function Items() {
       }
     }
     return allIds
+  }, [])
+
+  // Enrich items with availability data from checkout logs
+  const enrichItemsWithAvailability = async (itemsData, checkoutsByItem) => {
+    return Promise.all(
+      itemsData.map(async (item) => {
+        const activeCheckouts = checkoutsByItem[item.id] || []
+        const availability = await calculateItemAvailability(item, activeCheckouts)
+        return { ...item, ...availability }
+      })
+    )
   }
 
-  // Initial load + refetch when mode/filters/page change
+  // Main data fetch function
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+
+    try {
+      // Fetch reference data (categories, locations, checkout logs)
+      const [categoriesResult, locationsData, checkoutLogsResult] = await Promise.all([
+        supabase.from('categories').select('*').is('deleted_at', null).order('name'),
+        supabase.from('locations').select('*').is('deleted_at', null).order('path'),
+        supabase.from('checkout_logs').select('*').is('checked_in_at', null),
+      ])
+
+      if (categoriesResult.data) setCategories(categoriesResult.data)
+      if (locationsData.data) setLocations(locationsData.data)
+
+      const checkoutsByItem = {}
+      if (checkoutLogsResult.data) {
+        checkoutLogsResult.data.forEach(log => {
+          if (!checkoutsByItem[log.item_id]) checkoutsByItem[log.item_id] = []
+          checkoutsByItem[log.item_id].push(log)
+        })
+      }
+
+      // Compute sublocation IDs from freshly fetched locations (not stale state)
+      const freshLocations = locationsData.data || []
+      let resolvedSublocationIds = []
+      if (selectedLocation) {
+        resolvedSublocationIds = computeSublocationIds(selectedLocation, freshLocations)
+        setSublocationIds(resolvedSublocationIds)
+      }
+
+      if (isClientSideMode) {
+        // Client-side: fetch all items
+        const itemsResult = await fetchAllRows(
+          supabase
+            .from('items')
+            .select('*, category:categories(name, icon), location:locations(name, path)')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+        )
+        if (itemsResult.data) {
+          const enriched = await enrichItemsWithAvailability(itemsResult.data, checkoutsByItem)
+          setItems(enriched)
+        }
+      } else {
+        // Server-side: paginated fetch with filters
+        let query = supabase
+          .from('items')
+          .select('*, category:categories(name, icon), location:locations(name, path)', { count: 'exact' })
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+
+        if (selectedCategory) {
+          query = query.eq('category_id', selectedCategory)
+        }
+        if (selectedLocation && resolvedSublocationIds.length > 0) {
+          query = query.in('location_id', resolvedSublocationIds)
+        }
+
+        const from = (currentPage - 1) * PAGE_SIZE
+        query = query.range(from, from + PAGE_SIZE - 1)
+
+        const { data, count, error } = await query
+        if (error) {
+          console.error('Error fetching items:', error)
+          return
+        }
+
+        const enriched = await enrichItemsWithAvailability(data || [], checkoutsByItem)
+        setItems(enriched)
+        setTotalCount(count || 0)
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [isClientSideMode, currentPage, selectedCategory, selectedLocation, computeSublocationIds])
+
+  // Fetch on mount and when filters/page change
   useEffect(() => {
     fetchData()
-  }, [isClientSideMode, currentPage, selectedCategory, selectedLocation, sublocationIds])
+  }, [fetchData])
 
   // Re-fetch locations when the page becomes visible again (to catch renames)
   useEffect(() => {
@@ -397,14 +362,11 @@ export default function Items() {
             .select('*')
             .is('deleted_at', null)
             .order('path')
-          if (locationsData) {
-            setLocations(locationsData)
-          }
+          if (locationsData) setLocations(locationsData)
         }
         refreshLocations()
       }
     }
-
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
@@ -412,15 +374,12 @@ export default function Items() {
   // Filter items when in client-side mode
   useEffect(() => {
     if (!isClientSideMode) {
-      // In server mode, items are already the correct page
-      // totalCount is set by fetchServerSide with the correct server count
       setFilteredItems(items)
       return
     }
 
     let filtered = [...items]
 
-    // Filter by search query (AI or fuzzy)
     if (searchQuery) {
       if (useAiSearch && aiMatchingIds.length > 0) {
         filtered = filtered.filter((item) => aiMatchingIds.includes(item.id))
@@ -429,19 +388,16 @@ export default function Items() {
       }
     }
 
-    // Filter by category
     if (selectedCategory) {
       filtered = filtered.filter((item) => item.category_id === selectedCategory)
     }
 
-    // Filter by status
     if (selectedStatus === 'available') {
       filtered = filtered.filter((item) => item.checkedOutQuantity === 0 && item.quantity !== null && item.quantity > 0)
     } else if (selectedStatus === 'checked_out') {
       filtered = filtered.filter((item) => item.checkedOutQuantity > 0)
     }
 
-    // Filter by location (includes sublocations)
     if (selectedLocation && sublocationIds.length > 0) {
       filtered = filtered.filter((item) => sublocationIds.includes(item.location_id))
     }
@@ -449,14 +405,6 @@ export default function Items() {
     setFilteredItems(filtered)
     setTotalCount(filtered.length)
   }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds, useAiSearch, aiMatchingIds, isClientSideMode])
-
-  useEffect(() => {
-    if (selectedLocation) {
-      getAllSublocationIds(selectedLocation)
-    } else {
-      setSublocationIds([])
-    }
-  }, [selectedLocation, locations])
 
   // AI Search Effect
   useEffect(() => {
@@ -483,27 +431,6 @@ export default function Items() {
 
     performAiSearch()
   }, [useAiSearch, searchQuery, items])
-
-  // Recursively get all sublocation IDs for a given location
-  const getAllSublocationIds = async (locationId) => {
-    setSublocationIds([locationId])
-
-    const allIds = [locationId]
-    const queue = [locationId]
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()
-      const children = locations.filter(loc => loc.parent_id === currentId)
-      for (const child of children) {
-        if (!allIds.includes(child.id)) {
-          allIds.push(child.id)
-          queue.push(child.id)
-        }
-      }
-    }
-
-    setSublocationIds(allIds)
-  }
 
   const handlePageChange = useCallback((page) => {
     updateParams({ page: page === 1 ? null : page })
