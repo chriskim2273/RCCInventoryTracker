@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { supabase, fetchAllRows } from '@/lib/supabase'
 import { Package, CheckCircle, Trash2, MapPin, X, Plus } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { calculateItemAvailability, getItemStatus, formatItemStatus } from '@/lib/itemUtils'
@@ -8,7 +8,10 @@ import { fuzzySearchItems } from '@/lib/fuzzySearch'
 import DeleteConfirmationModal from '@/components/DeleteConfirmationModal'
 import ItemModal from '@/components/ItemModal'
 import SearchBar from '@/components/SearchBar'
+import Pagination from '@/components/Pagination'
 import { aiSearch } from '@/lib/aiSearch'
+
+const PAGE_SIZE = 50
 
 // Memoized Mobile Item Card Component
 const MobileItemCard = memo(({ item, isSelected, canEdit, onToggleSelect, currentSearchParams }) => {
@@ -197,6 +200,7 @@ export default function Items() {
   const [aiMatchingIds, setAiMatchingIds] = useState([])
   const [aiSearchError, setAiSearchError] = useState(null)
   const [showItemModal, setShowItemModal] = useState(false)
+  const [totalCount, setTotalCount] = useState(0)
   const { canEdit, user } = useAuth()
 
   // Derive filter state directly from URL params (single source of truth)
@@ -205,6 +209,10 @@ export default function Items() {
   const selectedCategory = searchParams.get('category') || null
   const selectedStatus = searchParams.get('status') || 'all'
   const selectedLocation = searchParams.get('location') || null
+  const currentPage = parseInt(searchParams.get('page')) || 1
+
+  // Determine if we need client-side mode
+  const isClientSideMode = useAiSearch || (searchQuery && !useAiSearch) || selectedStatus !== 'all'
 
   // Helper to update URL params
   const updateParams = useCallback((updates) => {
@@ -221,15 +229,168 @@ export default function Items() {
     }, { replace: true })
   }, [setSearchParams])
 
+  // Compute which items to display on the current page
+  const displayItems = useMemo(() => {
+    if (isClientSideMode) {
+      // Client-side pagination: slice filteredItems
+      const start = (currentPage - 1) * PAGE_SIZE
+      return filteredItems.slice(start, start + PAGE_SIZE)
+    }
+    // Server-side mode: items state IS the current page
+    return items
+  }, [isClientSideMode, currentPage, filteredItems, items])
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
+
+  // Fetch reference data (categories, locations, checkout logs) - these are always needed
+  const fetchReferenceData = async () => {
+    const [categoriesResult, locationsData, checkoutLogsResult] = await Promise.all([
+      supabase.from('categories').select('*').is('deleted_at', null).order('name'),
+      supabase.from('locations').select('*').is('deleted_at', null).order('path'),
+      supabase
+        .from('checkout_logs')
+        .select('*')
+        .is('checked_in_at', null),
+    ])
+
+    if (categoriesResult.data) setCategories(categoriesResult.data)
+    if (locationsData.data) setLocations(locationsData.data)
+
+    // Build checkout map
+    const checkoutsByItem = {}
+    if (checkoutLogsResult.data) {
+      checkoutLogsResult.data.forEach(log => {
+        if (!checkoutsByItem[log.item_id]) {
+          checkoutsByItem[log.item_id] = []
+        }
+        checkoutsByItem[log.item_id].push(log)
+      })
+    }
+
+    return { categories: categoriesResult.data, locations: locationsData.data, checkoutsByItem }
+  }
+
+  // Enrich items with availability data from checkout logs
+  const enrichItemsWithAvailability = async (itemsData, checkoutsByItem) => {
+    return Promise.all(
+      itemsData.map(async (item) => {
+        const activeCheckouts = checkoutsByItem[item.id] || []
+        const availability = await calculateItemAvailability(item, activeCheckouts)
+        return { ...item, ...availability }
+      })
+    )
+  }
+
+  // Server-side paginated fetch
+  const fetchServerSide = async (page, checkoutsByItem, resolvedSublocationIds) => {
+    let query = supabase
+      .from('items')
+      .select(`
+        *,
+        category:categories(name, icon),
+        location:locations(name, path)
+      `, { count: 'exact' })
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+
+    // Apply server-side filters
+    if (selectedCategory) {
+      query = query.eq('category_id', selectedCategory)
+    }
+
+    if (selectedLocation && resolvedSublocationIds.length > 0) {
+      query = query.in('location_id', resolvedSublocationIds)
+    }
+
+    // Apply range for pagination
+    const from = (page - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+    query = query.range(from, to)
+
+    const { data, count, error } = await query
+
+    if (error) {
+      console.error('Error fetching items:', error)
+      return
+    }
+
+    const enriched = await enrichItemsWithAvailability(data || [], checkoutsByItem)
+    setItems(enriched)
+    setTotalCount(count || 0)
+  }
+
+  // Client-side full fetch (for search/status filters)
+  const fetchClientSide = async (checkoutsByItem) => {
+    const itemsResult = await fetchAllRows(
+      supabase
+        .from('items')
+        .select(`
+          *,
+          category:categories(name, icon),
+          location:locations(name, path)
+        `)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+    )
+
+    if (itemsResult.data) {
+      const enriched = await enrichItemsWithAvailability(itemsResult.data, checkoutsByItem)
+      setItems(enriched)
+    }
+  }
+
+  // Main data fetch function
+  const fetchData = useCallback(async (options = {}) => {
+    const { skipLoading = false } = options
+    if (!skipLoading) setLoading(true)
+
+    try {
+      const { checkoutsByItem } = await fetchReferenceData()
+
+      if (isClientSideMode) {
+        await fetchClientSide(checkoutsByItem)
+      } else {
+        // Resolve sublocation IDs synchronously from current locations state
+        let resolvedSublocationIds = sublocationIds
+        if (selectedLocation && sublocationIds.length === 0) {
+          // sublocationIds might not be ready yet, compute inline
+          resolvedSublocationIds = computeSublocationIds(selectedLocation, locations)
+        }
+        await fetchServerSide(currentPage, checkoutsByItem, resolvedSublocationIds)
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [isClientSideMode, currentPage, selectedCategory, selectedLocation, sublocationIds])
+
+  // Compute sublocation IDs synchronously from locations array
+  const computeSublocationIds = (locationId, locationsList) => {
+    const allIds = [locationId]
+    const queue = [locationId]
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      const children = locationsList.filter(loc => loc.parent_id === currentId)
+      for (const child of children) {
+        if (!allIds.includes(child.id)) {
+          allIds.push(child.id)
+          queue.push(child.id)
+        }
+      }
+    }
+    return allIds
+  }
+
+  // Initial load + refetch when mode/filters/page change
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [isClientSideMode, currentPage, selectedCategory, selectedLocation, sublocationIds])
 
   // Re-fetch locations when the page becomes visible again (to catch renames)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Refresh locations data to catch any name changes made elsewhere
         const refreshLocations = async () => {
           const { data: locationsData } = await supabase
             .from('locations')
@@ -248,10 +409,46 @@ export default function Items() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
-  // Filter items when dependencies change
+  // Filter items when in client-side mode
   useEffect(() => {
-    filterItems()
-  }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds, useAiSearch, aiMatchingIds])
+    if (!isClientSideMode) {
+      // In server mode, items are already the correct page
+      setFilteredItems(items)
+      setTotalCount(items.length) // This gets overridden by server count in server mode
+      return
+    }
+
+    let filtered = [...items]
+
+    // Filter by search query (AI or fuzzy)
+    if (searchQuery) {
+      if (useAiSearch && aiMatchingIds.length > 0) {
+        filtered = filtered.filter((item) => aiMatchingIds.includes(item.id))
+      } else if (!useAiSearch) {
+        filtered = fuzzySearchItems(filtered, searchQuery)
+      }
+    }
+
+    // Filter by category
+    if (selectedCategory) {
+      filtered = filtered.filter((item) => item.category_id === selectedCategory)
+    }
+
+    // Filter by status
+    if (selectedStatus === 'available') {
+      filtered = filtered.filter((item) => item.checkedOutQuantity === 0 && item.quantity !== null && item.quantity > 0)
+    } else if (selectedStatus === 'checked_out') {
+      filtered = filtered.filter((item) => item.checkedOutQuantity > 0)
+    }
+
+    // Filter by location (includes sublocations)
+    if (selectedLocation && sublocationIds.length > 0) {
+      filtered = filtered.filter((item) => sublocationIds.includes(item.location_id))
+    }
+
+    setFilteredItems(filtered)
+    setTotalCount(filtered.length)
+  }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds, useAiSearch, aiMatchingIds, isClientSideMode])
 
   useEffect(() => {
     if (selectedLocation) {
@@ -287,29 +484,8 @@ export default function Items() {
     performAiSearch()
   }, [useAiSearch, searchQuery, items])
 
-  // Scroll persistence - save scroll position when navigating away
-  useEffect(() => {
-    return () => {
-      sessionStorage.setItem('items-scroll', String(window.scrollY))
-    }
-  }, [])
-
-  // Scroll persistence - restore scroll position after content loads
-  useEffect(() => {
-    if (!loading && filteredItems.length > 0) {
-      const savedScroll = sessionStorage.getItem('items-scroll')
-      if (savedScroll) {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, parseInt(savedScroll, 10))
-        })
-        sessionStorage.removeItem('items-scroll')
-      }
-    }
-  }, [loading, filteredItems.length])
-
   // Recursively get all sublocation IDs for a given location
   const getAllSublocationIds = async (locationId) => {
-    // Immediately set the current location ID so filtering works right away
     setSublocationIds([locationId])
 
     const allIds = [locationId]
@@ -317,10 +493,7 @@ export default function Items() {
 
     while (queue.length > 0) {
       const currentId = queue.shift()
-
-      // Get all direct children of current location
       const children = locations.filter(loc => loc.parent_id === currentId)
-
       for (const child of children) {
         if (!allIds.includes(child.id)) {
           allIds.push(child.id)
@@ -329,126 +502,33 @@ export default function Items() {
       }
     }
 
-    // Update with full list including sublocations
     setSublocationIds(allIds)
   }
 
-  const fetchData = async () => {
-    setLoading(true)
-
-    try {
-      const [itemsResult, categoriesResult, locationsData, checkoutLogsResult] = await Promise.all([
-        supabase
-          .from('items')
-          .select(`
-            *,
-            category:categories(name, icon),
-            location:locations(name, path)
-          `)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false }),
-        supabase.from('categories').select('*').is('deleted_at', null).order('name'),
-        supabase.from('locations').select('*').is('deleted_at', null).order('path'),
-        supabase
-          .from('checkout_logs')
-          .select('*')
-          .is('checked_in_at', null),
-      ])
-
-      if (itemsResult.data) {
-        // Group checkout logs by item_id
-        const checkoutsByItem = {}
-        if (checkoutLogsResult.data) {
-          checkoutLogsResult.data.forEach(log => {
-            if (!checkoutsByItem[log.item_id]) {
-              checkoutsByItem[log.item_id] = []
-            }
-            checkoutsByItem[log.item_id].push(log)
-          })
-        }
-
-        // Calculate availability for each item
-        const itemsWithAvailability = await Promise.all(
-          itemsResult.data.map(async (item) => {
-            const activeCheckouts = checkoutsByItem[item.id] || []
-            const availability = await calculateItemAvailability(item, activeCheckouts)
-            return {
-              ...item,
-              ...availability
-            }
-          })
-        )
-
-        setItems(itemsWithAvailability)
-      }
-
-      if (categoriesResult.data) {
-        setCategories(categoriesResult.data)
-      }
-
-      if (locationsData.data) {
-        setLocations(locationsData.data)
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filterItems = () => {
-    let filtered = [...items]
-
-    // Filter by search query (AI or fuzzy)
-    if (searchQuery) {
-      if (useAiSearch && aiMatchingIds.length > 0) {
-        // Use AI search results
-        filtered = filtered.filter((item) => aiMatchingIds.includes(item.id))
-      } else if (!useAiSearch) {
-        // Use fuzzy search (searches name, description, brand, model, serial_number, asset tag)
-        filtered = fuzzySearchItems(filtered, searchQuery)
-      }
-    }
-
-    // Filter by category
-    if (selectedCategory) {
-      filtered = filtered.filter((item) => item.category_id === selectedCategory)
-    }
-
-    // Filter by status
-    if (selectedStatus === 'available') {
-      filtered = filtered.filter((item) => item.checkedOutQuantity === 0 && item.quantity !== null && item.quantity > 0)
-    } else if (selectedStatus === 'checked_out') {
-      filtered = filtered.filter((item) => item.checkedOutQuantity > 0)
-    }
-
-    // Filter by location (includes sublocations)
-    if (selectedLocation && sublocationIds.length > 0) {
-      filtered = filtered.filter((item) => sublocationIds.includes(item.location_id))
-    }
-
-    setFilteredItems(filtered)
-  }
+  const handlePageChange = useCallback((page) => {
+    updateParams({ page: page === 1 ? null : page })
+    setSelectedItems(new Set())
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [updateParams])
 
   const handleRegularSearch = useCallback((inputValue) => {
     setSearchLoading(true)
     setAiSearchError(null)
     setAiMatchingIds([])
-    updateParams({ search: inputValue, ai: null })
-    // Simulate brief loading for UI consistency
+    updateParams({ search: inputValue, ai: null, page: null })
     setTimeout(() => {
       setSearchLoading(false)
     }, 100)
   }, [updateParams])
 
   const handleAiSearch = useCallback((inputValue) => {
-    updateParams({ search: inputValue, ai: '1' })
+    updateParams({ search: inputValue, ai: '1', page: null })
   }, [updateParams])
 
   const handleClearSearch = useCallback(() => {
     setAiMatchingIds([])
     setAiSearchError(null)
-    updateParams({ search: null, ai: null })
+    updateParams({ search: null, ai: null, page: null })
   }, [updateParams])
 
   const toggleSelectItem = useCallback((itemId) => {
@@ -464,8 +544,11 @@ export default function Items() {
   }, [])
 
   const exportToCSV = () => {
+    // In client-side mode, export all filtered items (all pages)
+    // In server-side mode, export the current page items
+    const exportItems = isClientSideMode ? filteredItems : items
     const headers = ['Name', 'Brand', 'Serial Number', 'Total Qty', 'Available Qty', 'Checked Out Qty', 'Category', 'Location', 'Status']
-    const rows = filteredItems.map((item) => {
+    const rows = exportItems.map((item) => {
       const status = getItemStatus(item, item.availableQuantity, item.checkedOutQuantity)
       const statusText = formatItemStatus(status, item.availableQuantity, item.quantity)
 
@@ -496,10 +579,10 @@ export default function Items() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedItems.size === filteredItems.length) {
+    if (selectedItems.size === displayItems.length) {
       setSelectedItems(new Set())
     } else {
-      setSelectedItems(new Set(filteredItems.map(item => item.id)))
+      setSelectedItems(new Set(displayItems.map(item => item.id)))
     }
   }
 
@@ -573,7 +656,7 @@ export default function Items() {
             <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Category</label>
             <select
               value={selectedCategory || ''}
-              onChange={(e) => updateParams({ category: e.target.value || null })}
+              onChange={(e) => updateParams({ category: e.target.value || null, page: null })}
               className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="">All Categories</option>
@@ -589,7 +672,7 @@ export default function Items() {
             <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Status</label>
             <select
               value={selectedStatus}
-              onChange={(e) => updateParams({ status: e.target.value })}
+              onChange={(e) => updateParams({ status: e.target.value, page: null })}
               className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="all">All Statuses</option>
@@ -602,7 +685,7 @@ export default function Items() {
             <label className="block text-xs sm:text-sm font-medium mb-1.5 sm:mb-2">Location</label>
             <select
               value={selectedLocation || ''}
-              onChange={(e) => updateParams({ location: e.target.value || null })}
+              onChange={(e) => updateParams({ location: e.target.value || null, page: null })}
               className="w-full px-3 py-2 text-sm sm:text-base border rounded-md bg-background"
             >
               <option value="">All Locations</option>
@@ -619,7 +702,7 @@ export default function Items() {
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <h2 className="text-lg sm:text-xl font-semibold">
-            Items ({filteredItems.length})
+            Items ({totalCount})
           </h2>
           {canEdit && (
             <button
@@ -634,7 +717,7 @@ export default function Items() {
 
         {loading ? (
           <div className="text-center py-8 text-sm text-muted-foreground">Loading...</div>
-        ) : filteredItems.length === 0 ? (
+        ) : displayItems.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             No items found. {searchQuery || selectedCategory || selectedStatus !== 'all' || selectedLocation ? 'Try adjusting your filters.' : 'Start by adding items to your inventory.'}
           </div>
@@ -642,7 +725,7 @@ export default function Items() {
           <>
             {/* Mobile Card View */}
             <div className="lg:hidden space-y-3">
-              {filteredItems.map((item) => (
+              {displayItems.map((item) => (
                 <MobileItemCard
                   key={item.id}
                   item={item}
@@ -663,7 +746,7 @@ export default function Items() {
                       <th className="px-4 py-3 w-12">
                         <input
                           type="checkbox"
-                          checked={selectedItems.size === filteredItems.length && filteredItems.length > 0}
+                          checked={selectedItems.size === displayItems.length && displayItems.length > 0}
                           onChange={toggleSelectAll}
                           className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                         />
@@ -678,7 +761,7 @@ export default function Items() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filteredItems.map((item) => (
+                  {displayItems.map((item) => (
                     <DesktopItemRow
                       key={item.id}
                       item={item}
@@ -691,6 +774,14 @@ export default function Items() {
                 </tbody>
               </table>
             </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={PAGE_SIZE}
+              onPageChange={handlePageChange}
+            />
           </>
         )}
       </div>
