@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase, fetchAllRows } from '@/lib/supabase'
 import { Package, CheckCircle, Trash2, MapPin, X, Plus } from 'lucide-react'
@@ -199,6 +199,8 @@ export default function Items() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [aiMatchingIds, setAiMatchingIds] = useState([])
   const [aiSearchError, setAiSearchError] = useState(null)
+  const itemsRef = useRef(items)
+  const aiSearchControllerRef = useRef(null)
   const [showItemModal, setShowItemModal] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
   const { canEdit, user } = useAuth()
@@ -406,6 +408,11 @@ export default function Items() {
     setTotalCount(filtered.length)
   }, [items, selectedCategory, selectedStatus, selectedLocation, searchQuery, sublocationIds, useAiSearch, aiMatchingIds, isClientSideMode])
 
+  // Keep items ref in sync
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
+
   // AI Search Effect
   useEffect(() => {
     if (!useAiSearch || !searchQuery.trim()) {
@@ -414,23 +421,39 @@ export default function Items() {
       return
     }
 
+    // Cancel any in-flight AI search
+    if (aiSearchControllerRef.current) {
+      aiSearchControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    aiSearchControllerRef.current = controller
+
     const performAiSearch = async () => {
       setSearchLoading(true)
       setAiSearchError(null)
       try {
-        const matchingIds = await aiSearch(items, searchQuery)
-        setAiMatchingIds(matchingIds)
+        const matchingIds = await aiSearch(itemsRef.current, searchQuery, { signal: controller.signal })
+        if (!controller.signal.aborted) {
+          setAiMatchingIds(matchingIds)
+        }
       } catch (error) {
+        if (controller.signal.aborted) return
         console.error('AI search failed:', error)
         setAiSearchError(error.message)
         setAiMatchingIds([])
       } finally {
-        setSearchLoading(false)
+        if (!controller.signal.aborted) {
+          setSearchLoading(false)
+        }
       }
     }
 
     performAiSearch()
-  }, [useAiSearch, searchQuery, items])
+
+    return () => {
+      controller.abort()
+    }
+  }, [useAiSearch, searchQuery])
 
   const handlePageChange = useCallback((page) => {
     updateParams({ page: page === 1 ? null : page })

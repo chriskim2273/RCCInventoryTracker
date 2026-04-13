@@ -13,14 +13,16 @@ const FALLBACK_MODELS = [
 /**
  * Try a single model
  */
-async function tryModelSearch(model, apiKey, minimalItems, searchQuery) {
-  const systemPrompt = `You are a search assistant. Return ONLY a JSON array of item IDs that match the search query. No explanation, just the array.`
+async function tryModelSearch(model, apiKey, minimalItems, searchQuery, signal) {
+  const systemPrompt = `You are an inventory search assistant. Given a list of items and a search query, return ONLY a JSON array of item IDs that match the query. Consider name, brand, model, description, and category when matching. Be generous with partial matches and semantic similarity. Return ONLY the JSON array, no explanation.`
 
-  const userPrompt = `Items: ${JSON.stringify(minimalItems)}
+  const userPrompt = `Items:
+${JSON.stringify(minimalItems)}
 
 Search query: "${searchQuery}"
 
-Return matching item IDs as JSON array: ["id1", "id2", ...]`
+Return matching item IDs as a JSON array: ["id1", "id2", ...]
+If nothing matches, return: []`
 
   const requestBody = {
     model: model,
@@ -43,6 +45,7 @@ Return matching item IDs as JSON array: ["id1", "id2", ...]`
       'HTTP-Referer': window.location.origin,
     },
     body: JSON.stringify(requestBody),
+    signal,
   })
 
   const endTime = performance.now()
@@ -63,9 +66,13 @@ Return matching item IDs as JSON array: ["id1", "id2", ...]`
  * Search items using AI
  * @param {Array} items - Array of item objects
  * @param {string} searchQuery - User's search query
+ * @param {Object} [options] - Options
+ * @param {AbortSignal} [options.signal] - AbortController signal
  * @returns {Promise<Array>} Array of matching item IDs
  */
-export async function aiSearch(items, searchQuery) {
+export async function aiSearch(items, searchQuery, options = {}) {
+  const { signal } = options
+
   console.log('[AI Search] Starting search...')
   console.log('[AI Search] Query:', searchQuery)
   console.log('[AI Search] Total items to search:', items.length)
@@ -82,16 +89,20 @@ export async function aiSearch(items, searchQuery) {
     return []
   }
 
-  // Minimize token usage - only send essential fields
-  const minimalItems = items.map((item) => ({
-    id: item.id,
-    name: item.name,
-    brand: item.brand,
-    model: item.model,
-  }))
+  // Send more fields for better search quality, but keep it minimal for tokens
+  const minimalItems = items.map((item) => {
+    const entry = {
+      id: item.id,
+      name: item.name,
+    }
+    if (item.brand) entry.brand = item.brand
+    if (item.model) entry.model = item.model
+    if (item.description) entry.desc = item.description
+    if (item.category?.name) entry.cat = item.category.name
+    return entry
+  })
 
   console.log('[AI Search] Prepared minimal items:', minimalItems.length)
-  console.log('[AI Search] Sample item:', minimalItems[0])
   console.log('[AI Search] Estimated prompt size:', JSON.stringify(minimalItems).length, 'characters')
 
   // Try each model in sequence until one succeeds
@@ -100,9 +111,11 @@ export async function aiSearch(items, searchQuery) {
   for (let i = 0; i < FALLBACK_MODELS.length; i++) {
     const model = FALLBACK_MODELS[i]
     try {
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
       console.log(`[AI Search] Attempt ${i + 1}/${FALLBACK_MODELS.length}: Using model ${model}`)
 
-      const data = await tryModelSearch(model, apiKey, minimalItems, searchQuery)
+      const data = await tryModelSearch(model, apiKey, minimalItems, searchQuery, signal)
 
       const content = data.choices[0]?.message?.content
       console.log('[AI Search] Raw LLM response:', content)
@@ -116,58 +129,45 @@ export async function aiSearch(items, searchQuery) {
       // Parse the JSON array from response
       // Handle potential markdown code blocks
       let jsonStr = content.trim()
-      console.log('[AI Search] Trimmed response:', jsonStr)
 
       if (jsonStr.startsWith('```')) {
-        console.log('[AI Search] Response has markdown code blocks, removing...')
         jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```\n?/g, '').trim()
-        console.log('[AI Search] Cleaned response:', jsonStr)
       }
 
-      console.log('[AI Search] Parsing JSON...')
       let matchingIds
       try {
         matchingIds = JSON.parse(jsonStr)
       } catch (parseError) {
         console.error('[AI Search] JSON parsing failed:', parseError.message)
 
-        // Check if this is an unterminated string error (response too long)
         if (parseError.message.includes('Unterminated string') ||
             parseError.message.includes('Unexpected end of JSON')) {
-          console.error('[AI Search] Response appears truncated - query too generic')
           throw new Error('Your search query is too generic and matches too many items. Please be more specific (e.g., include brand, model, or category).')
         }
 
-        // Other JSON parsing errors
         lastError = parseError
         continue
       }
 
-      console.log('[AI Search] Parsed result:', matchingIds)
-
       // Validate response is an array
       if (!Array.isArray(matchingIds)) {
         console.error('[AI Search] Response is not an array:', matchingIds)
-        console.error('[AI Search] Response type:', typeof matchingIds)
         lastError = new Error('Response is not an array')
         continue
       }
 
       console.log(`[AI Search] Success with model ${model}! Found ${matchingIds.length} matching items`)
-      console.log('[AI Search] Matching IDs:', matchingIds)
-
       return matchingIds
     } catch (error) {
+      if (error.name === 'AbortError') throw error
+
       console.error(`[AI Search] Model ${model} failed:`, error.message)
       lastError = error
 
-      // If error is about query being too generic, stop trying other models
       if (error.message.includes('too generic')) {
-        console.error('[AI Search] Stopping fallback attempts - query too generic')
         throw error
       }
 
-      // If this isn't the last model, continue to next one
       if (i < FALLBACK_MODELS.length - 1) {
         console.log('[AI Search] Trying next fallback model...')
         continue
