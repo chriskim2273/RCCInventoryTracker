@@ -537,19 +537,39 @@ export default function Items() {
   }
 
   const handleBulkDelete = async () => {
+    const itemIds = Array.from(selectedItems)
+
+    // Get item names for audit log
+    const deletedItems = items.filter(item => selectedItems.has(item.id))
+    const itemNames = deletedItems.map(item => item.name)
+
     const { error } = await supabase
       .from('items')
       .update({
         deleted_at: new Date().toISOString(),
         deleted_by: user?.id,
       })
-      .in('id', Array.from(selectedItems))
+      .in('id', itemIds)
 
     if (error) {
       console.error('Error deleting items:', error)
       alert('Failed to delete items. Please try again.')
       throw error
     }
+
+    // Log bulk delete to admin audit
+    const userName = user?.first_name && user?.last_name
+      ? `${user.first_name} ${user.last_name}`
+      : user?.email
+    await supabase.from('audit_logs').insert({
+      user_id: user?.id,
+      user_name: userName,
+      action: 'bulk_delete',
+      details: {
+        item_count: itemIds.length,
+        item_names: itemNames,
+      },
+    })
 
     await fetchData()
     setSelectedItems(new Set())
@@ -563,12 +583,33 @@ export default function Items() {
 
     setIsProcessing(true)
     try {
+      const itemIds = Array.from(selectedItems)
+
+      // Get item names and target location for audit log
+      const movedItems = items.filter(item => selectedItems.has(item.id))
+      const itemNames = movedItems.map(item => item.name)
+
       const { error } = await supabase
         .from('items')
         .update({ location_id: moveToLocationId })
-        .in('id', Array.from(selectedItems))
+        .in('id', itemIds)
 
       if (error) throw error
+
+      // Log bulk move to admin audit
+      const userName = user?.first_name && user?.last_name
+        ? `${user.first_name} ${user.last_name}`
+        : user?.email
+      await supabase.from('audit_logs').insert({
+        user_id: user?.id,
+        user_name: userName,
+        action: 'bulk_move',
+        details: {
+          item_count: itemIds.length,
+          item_names: itemNames,
+          target_location_id: moveToLocationId,
+        },
+      })
 
       await fetchData()
       setSelectedItems(new Set())

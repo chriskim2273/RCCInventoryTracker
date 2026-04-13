@@ -248,23 +248,92 @@ export default function AdminPanel() {
     return filtered
   }, [users, userSearchQuery, userRoleFilter, userStatusFilter])
 
+  // Consolidate consecutive updates by same user within 5-minute window
+  const consolidateLogs = (logs) => {
+    if (!logs || logs.length === 0) return []
+
+    const consolidated = []
+    let currentGroup = null
+    const TIME_WINDOW_MS = 5 * 60 * 1000
+
+    logs.forEach((log) => {
+      const logTime = new Date(log.timestamp).getTime()
+
+      if (
+        currentGroup &&
+        currentGroup.user_id === log.user_id &&
+        currentGroup.item_id === log.item_id &&
+        currentGroup.action === 'update' &&
+        log.action === 'update' &&
+        (currentGroup.lastTimestamp - logTime) < TIME_WINDOW_MS
+      ) {
+        if (log.changes?.old) {
+          Object.keys(log.changes.old).forEach((key) => {
+            currentGroup.mergedOldValues[key] = log.changes.old[key]
+          })
+        }
+        if (log.changes?.new) {
+          Object.keys(log.changes.new).forEach((key) => {
+            if (!(key in currentGroup.mergedNewValues)) {
+              currentGroup.mergedNewValues[key] = log.changes.new[key]
+            }
+            if (log.changes?.old?.[key] !== undefined) {
+              currentGroup.mergedOldValues[key] = log.changes.old[key]
+            }
+          })
+        }
+        currentGroup.count++
+        currentGroup.firstTimestamp = logTime
+        currentGroup.individualLogs.push(log)
+      } else {
+        if (currentGroup) {
+          if (currentGroup.count > 1) {
+            currentGroup.changes = {
+              old: currentGroup.mergedOldValues,
+              new: currentGroup.mergedNewValues
+            }
+          }
+          consolidated.push(currentGroup)
+        }
+
+        currentGroup = {
+          ...log,
+          count: 1,
+          firstTimestamp: logTime,
+          lastTimestamp: logTime,
+          mergedOldValues: log.changes?.old ? { ...log.changes.old } : {},
+          mergedNewValues: log.changes?.new ? { ...log.changes.new } : {},
+          changes: log.changes,
+          individualLogs: [log]
+        }
+      }
+    })
+
+    if (currentGroup) {
+      if (currentGroup.count > 1) {
+        currentGroup.changes = {
+          old: currentGroup.mergedOldValues,
+          new: currentGroup.mergedNewValues
+        }
+      }
+      consolidated.push(currentGroup)
+    }
+
+    return consolidated
+  }
+
   const filteredAuditLogs = useMemo(() => {
-    let filtered = [...auditLogs]
+    // Consolidate before filtering so grouping works on full dataset
+    let filtered = consolidateLogs(auditLogs)
 
     if (auditSearchQuery) {
       const query = auditSearchQuery.toLowerCase()
       filtered = filtered.filter(log => {
-        // Search in item name if available
         if (log.item?.name?.toLowerCase().includes(query)) return true
-
-        // For hard-deleted items, search in the changes field
         if (log.changes?.old?.name?.toLowerCase().includes(query)) return true
         if (log.changes?.new?.name?.toLowerCase().includes(query)) return true
-
-        // Also search in serial numbers
         if (log.changes?.old?.serial_number?.toLowerCase().includes(query)) return true
         if (log.changes?.new?.serial_number?.toLowerCase().includes(query)) return true
-
         return false
       })
     }
@@ -934,15 +1003,14 @@ export default function AdminPanel() {
       const { error: auditError } = await supabase
         .from('audit_logs')
         .insert({
-          admin_id: currentUser.id,
+          user_id: currentUser.id,
           user_name: getUserDisplayName(currentUser),
           action: 'role_change',
-          target_user_id: user.id,
           details: {
+            target_user_id: user.id,
             user_email: user.email,
             old_role: user.role,
             new_role: newRole,
-            timestamp: new Date().toISOString()
           }
         })
 
@@ -2092,6 +2160,11 @@ export default function AdminPanel() {
                           </div>
                           <p className="text-sm text-muted-foreground">
                             {formatTimestamp(log.timestamp)} • {getUserDisplayName(log.user, log.user_name)}
+                            {log.count > 1 && (
+                              <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                {log.count} edits combined
+                              </span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -2266,6 +2339,9 @@ export default function AdminPanel() {
                       <option value="hard_delete_item">Hard Delete Item</option>
                       <option value="restore_category">Restore Category</option>
                       <option value="hard_delete_category">Hard Delete Category</option>
+                      <option value="bulk_delete">Bulk Delete</option>
+                      <option value="bulk_move">Bulk Move</option>
+                      <option value="role_change">Role Change</option>
                     </select>
                   </div>
 
@@ -2368,12 +2444,14 @@ export default function AdminPanel() {
                               {log.action === 'restore_category' && 'Category Restored'}
                               {log.action === 'hard_delete_category' && 'Category Permanently Deleted'}
                               {log.action === 'bulk_delete' && 'Bulk Deletion'}
+                              {log.action === 'bulk_move' && 'Bulk Move'}
+                              {log.action === 'role_change' && 'Role Change'}
                               {log.action === 'delete_user' && 'User Deletion'}
                               {log.action === 'new_user_notification_sent' && 'New User Notification Sent'}
                               {log.action === 'resend_confirmation' && 'Resend Confirmation Email'}
                               {log.action.includes('reset_password') && 'Password Reset'}
                               {log.action.includes('update_email') && 'Email Update'}
-                              {!['delete_location', 'restore_location', 'hard_delete_location', 'restore_item', 'hard_delete_item', 'restore_category', 'hard_delete_category', 'bulk_delete', 'delete_user', 'resend_confirmation', 'new_user_notification_sent'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
+                              {!['delete_location', 'restore_location', 'hard_delete_location', 'restore_item', 'hard_delete_item', 'restore_category', 'hard_delete_category', 'bulk_delete', 'bulk_move', 'role_change', 'delete_user', 'resend_confirmation', 'new_user_notification_sent'].includes(log.action) && !log.action.includes('reset_password') && !log.action.includes('update_email') && log.action.replace('_', ' ').toUpperCase()}
                             </h3>
                             <p className="text-sm text-muted-foreground">
                               {formatTimestamp(log.created_at)}
@@ -2468,6 +2546,36 @@ export default function AdminPanel() {
                               </div>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {(log.action === 'bulk_delete' || log.action === 'bulk_move') && log.details && (
+                        <div className="space-y-3 text-sm">
+                          <div className="bg-muted/50 rounded-lg p-4">
+                            <p className="font-medium mb-1">{log.details.item_count} items {log.action === 'bulk_delete' ? 'deleted' : 'moved'}</p>
+                          </div>
+                          {log.details.item_names?.length > 0 && (
+                            <div className="bg-muted/30 rounded-lg p-3 max-h-48 overflow-y-auto">
+                              <ul className="space-y-1">
+                                {log.details.item_names.map((name, idx) => (
+                                  <li key={idx} className="text-xs font-medium">{name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {log.action === 'role_change' && log.details && (
+                        <div className="text-sm">
+                          <div className="bg-muted/50 rounded-lg p-4">
+                            <p className="text-muted-foreground mb-1">User: <span className="font-medium text-foreground">{log.details.user_email}</span></p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">{log.details.old_role}</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">{log.details.new_role}</span>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
