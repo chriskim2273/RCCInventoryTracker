@@ -3,11 +3,26 @@ import { Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import Modal from './Modal'
 
 // Update this version when adding new changelog entries
-const CHANGELOG_VERSION = '1.8.0'
+const CHANGELOG_VERSION = '1.9.0'
 const STORAGE_KEY = `changelog_dismissed_v${CHANGELOG_VERSION}`
 
 // Changelog entries - add new versions at the top
 const CHANGELOG_ENTRIES = [
+  {
+    version: '1.9.0',
+    date: '2026-04-13',
+    title: 'AI Search & Audit Log Fixes',
+    changes: [
+      'Fixed AI Search using the previous query instead of the current search bar text',
+      'AI Search now cancels in-flight requests when starting a new search, preventing stale results',
+      'AI Search now includes item description and category for more accurate results',
+      'Fixed soft delete and restore actions being logged as generic "update" in audit logs',
+      'Fixed role changes silently failing to write to audit logs',
+      'Admin Panel audit tab now consolidates consecutive edits by the same user within 5 minutes',
+      'Bulk delete and bulk move operations now create admin audit log entries',
+      'Added Bulk Delete, Bulk Move, and Role Change filters to admin audit tab',
+    ],
+  },
   {
     version: '1.8.0',
     date: '2026-03-08',
