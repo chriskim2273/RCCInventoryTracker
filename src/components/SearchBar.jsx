@@ -9,7 +9,8 @@ const SearchBar = memo(({
   searchLoading,
   useAiSearch,
   activeSearchQuery,
-  aiSearchError
+  aiSearchError,
+  aiSearchProgress
 }) => {
   const [localInput, setLocalInput] = useState(activeSearchQuery || '')
   const [isAiHovered, setIsAiHovered] = useState(false)
@@ -57,6 +58,21 @@ const SearchBar = memo(({
           >
             <X className="h-4 w-4" />
           </button>
+        )}
+        {searchLoading && useAiSearch && aiSearchProgress && aiSearchProgress.total > 1 && (
+          <div className="absolute top-full mt-1 left-0 right-0 z-10">
+            <div className="flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400">
+              <div className="flex-1 h-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-violet-500 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.round((aiSearchProgress.completed / aiSearchProgress.total) * 100)}%` }}
+                />
+              </div>
+              <span className="whitespace-nowrap font-medium">
+                {aiSearchProgress.completed}/{aiSearchProgress.total}
+              </span>
+            </div>
+          </div>
         )}
         {aiSearchError && (
           <div className="absolute top-full mt-1 text-xs text-red-600">

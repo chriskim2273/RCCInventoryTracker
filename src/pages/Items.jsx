@@ -197,6 +197,7 @@ export default function Items() {
   const [moveToLocationId, setMoveToLocationId] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [searchLoading, setSearchLoading] = useState(false)
+  const [aiSearchProgress, setAiSearchProgress] = useState(null) // { completed, total }
   const [aiMatchingIds, setAiMatchingIds] = useState([])
   const [aiSearchError, setAiSearchError] = useState(null)
   const itemsRef = useRef(items)
@@ -431,8 +432,16 @@ export default function Items() {
     const performAiSearch = async () => {
       setSearchLoading(true)
       setAiSearchError(null)
+      setAiSearchProgress(null)
       try {
-        const matchingIds = await aiSearch(itemsRef.current, searchQuery, { signal: controller.signal })
+        const matchingIds = await aiSearch(itemsRef.current, searchQuery, {
+          signal: controller.signal,
+          onProgress: (progress) => {
+            if (!controller.signal.aborted) {
+              setAiSearchProgress(progress)
+            }
+          },
+        })
         if (!controller.signal.aborted) {
           setAiMatchingIds(matchingIds)
         }
@@ -444,6 +453,7 @@ export default function Items() {
       } finally {
         if (!controller.signal.aborted) {
           setSearchLoading(false)
+          setAiSearchProgress(null)
         }
       }
     }
@@ -600,6 +610,7 @@ export default function Items() {
       const userName = user?.first_name && user?.last_name
         ? `${user.first_name} ${user.last_name}`
         : user?.email
+      const targetLocation = locations.find(l => l.id === moveToLocationId)
       await supabase.from('audit_logs').insert({
         user_id: user?.id,
         user_name: userName,
@@ -608,6 +619,8 @@ export default function Items() {
           item_count: itemIds.length,
           item_names: itemNames,
           target_location_id: moveToLocationId,
+          target_location_name: targetLocation?.name,
+          target_location_path: targetLocation?.path,
         },
       })
 
@@ -640,6 +653,7 @@ export default function Items() {
           useAiSearch={useAiSearch}
           activeSearchQuery={searchQuery}
           aiSearchError={aiSearchError}
+          aiSearchProgress={aiSearchProgress}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">

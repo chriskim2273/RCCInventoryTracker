@@ -2553,6 +2553,9 @@ export default function AdminPanel() {
                         <div className="space-y-3 text-sm">
                           <div className="bg-muted/50 rounded-lg p-4">
                             <p className="font-medium mb-1">{log.details.item_count} items {log.action === 'bulk_delete' ? 'deleted' : 'moved'}</p>
+                            {log.action === 'bulk_move' && log.details.target_location_path && (
+                              <p className="text-muted-foreground">Destination: <span className="font-medium text-foreground">{log.details.target_location_path}</span></p>
+                            )}
                           </div>
                           {log.details.item_names?.length > 0 && (
                             <div className="bg-muted/30 rounded-lg p-3 max-h-48 overflow-y-auto">

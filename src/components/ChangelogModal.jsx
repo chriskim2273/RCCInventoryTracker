@@ -16,6 +16,8 @@ const CHANGELOG_ENTRIES = [
       'Fixed AI Search using the previous query instead of the current search bar text',
       'AI Search now cancels in-flight requests when starting a new search, preventing stale results',
       'AI Search now includes item description and category for more accurate results',
+      'AI Search splits large inventories into parallel chunks for faster results and shows a progress bar',
+      'AI Search retries failed requests automatically with exponential backoff',
       'Fixed soft delete and restore actions being logged as generic "update" in audit logs',
       'Fixed role changes silently failing to write to audit logs',
       'Admin Panel audit tab now consolidates consecutive edits by the same user within 5 minutes',
