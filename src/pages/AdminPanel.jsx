@@ -859,7 +859,8 @@ export default function AdminPanel() {
           ...log,
           item: log.item_id ? itemsMap.get(log.item_id) : null,
           performed_by_user: log.performed_by ? usersMap.get(log.performed_by) : null,
-          checked_out_to_user: log.checked_out_to_user_id ? usersMap.get(log.checked_out_to_user_id) : null
+          checked_out_to_user: log.checked_out_to_user_id ? usersMap.get(log.checked_out_to_user_id) : null,
+          checked_in_by_user: log.checked_in_by ? usersMap.get(log.checked_in_by) : null
         }))
 
         setCheckoutHistory(logsWithJoins)
@@ -3039,7 +3040,8 @@ export default function AdminPanel() {
                           <th className="px-4 py-3 text-left text-sm font-medium">Checked Out</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Checked In</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                          <th className="px-4 py-3 text-left text-sm font-medium">Performed By</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Checked Out By</th>
+                          <th className="px-4 py-3 text-left text-sm font-medium">Checked In By</th>
                           <th className="px-4 py-3 text-left text-sm font-medium">Notes</th>
                         </tr>
                       </thead>
@@ -3111,6 +3113,11 @@ export default function AdminPanel() {
                               </td>
                               <td className="px-4 py-3 text-sm">
                                 {getUserDisplayName(log.performed_by_user, log.performed_by_name)}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {log.checked_in_by || log.checked_in_by_name
+                                  ? getUserDisplayName(log.checked_in_by_user, log.checked_in_by_name)
+                                  : <span className="text-muted-foreground">-</span>}
                               </td>
                               <td className="px-4 py-3 text-sm max-w-xs">
                                 {log.checkout_notes && (

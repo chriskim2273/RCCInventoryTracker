@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import { formatTimestamp } from '@/lib/utils'
 import Modal from './Modal'
 
 export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
+  const { user } = useAuth()
   const [activeCheckouts, setActiveCheckouts] = useState([])
   const [selectedCheckouts, setSelectedCheckouts] = useState({}) // {checkoutId: quantityToReturn}
   const [formData, setFormData] = useState({
@@ -96,6 +98,10 @@ export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
         const outstanding = getOutstandingQuantity(checkout)
 
         // Update the checkout log
+        const checkedInByName = user?.first_name && user?.last_name
+          ? `${user.first_name} ${user.last_name}`
+          : user?.email || null
+
         if (quantityToReturn >= outstanding) {
           // Full check-in - mark as completed
           const { error: logError } = await supabase
@@ -104,6 +110,8 @@ export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
               checked_in_at: formData.checked_in_at,
               quantity_checked_in: checkout.quantity_checked_out,
               checkin_notes: formData.notes || null,
+              checked_in_by: user?.id || null,
+              checked_in_by_name: checkedInByName,
             })
             .eq('id', checkoutId)
 
@@ -116,6 +124,8 @@ export default function CheckinModal({ isOpen, onClose, onSuccess, item }) {
             .update({
               quantity_checked_in: newCheckedIn,
               checkin_notes: formData.notes || null,
+              checked_in_by: user?.id || null,
+              checked_in_by_name: checkedInByName,
             })
             .eq('id', checkoutId)
 

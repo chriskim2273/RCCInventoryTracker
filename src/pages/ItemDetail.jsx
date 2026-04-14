@@ -42,12 +42,12 @@ export default function ItemDetail() {
   const [showReorderModal, setShowReorderModal] = useState(false)
   const [expandedLogIds, setExpandedLogIds] = useState(new Set())
 
-  const getUserDisplayName = (user) => {
-    if (!user) return 'Unknown User'
+  const getUserDisplayName = (user, fallbackName) => {
+    if (!user) return fallbackName || 'Unknown User'
     if (user.first_name && user.last_name) {
       return `${user.first_name} ${user.last_name}`
     }
-    return user.email || 'Unknown User'
+    return user.email || fallbackName || 'Unknown User'
   }
 
   useEffect(() => {
@@ -211,7 +211,8 @@ export default function ItemDetail() {
       const checkoutLogsWithUsers = (checkoutLogsData.data || []).map(log => ({
         ...log,
         checked_out_to_user: log.checked_out_to_user_id ? usersMap.get(log.checked_out_to_user_id) : null,
-        performed_by_user: log.performed_by ? usersMap.get(log.performed_by) : null
+        performed_by_user: log.performed_by ? usersMap.get(log.performed_by) : null,
+        checked_in_by_user: log.checked_in_by ? usersMap.get(log.checked_in_by) : null
       }))
 
       setLogs(consolidateLogs(logsWithUsers))
@@ -673,8 +674,13 @@ export default function ItemDetail() {
                             </p>
                           )}
                           <p>
-                            <span className="font-medium">Performed By:</span> {getUserDisplayName(log.performed_by_user)}
+                            <span className="font-medium">Checked Out By:</span> {getUserDisplayName(log.performed_by_user, log.performed_by_name)}
                           </p>
+                          {(log.checked_in_by_user || log.checked_in_by_name) && (
+                            <p>
+                              <span className="font-medium">Checked In By:</span> {getUserDisplayName(log.checked_in_by_user, log.checked_in_by_name)}
+                            </p>
+                          )}
                         </div>
 
                         {log.checkout_notes && (
