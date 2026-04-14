@@ -10,7 +10,7 @@ const STORAGE_KEY = `changelog_dismissed_v${CHANGELOG_VERSION}`
 const CHANGELOG_ENTRIES = [
   {
     version: '1.9.0',
-    date: '2026-04-13',
+    date: '2026-04-14',
     title: 'AI Search & Audit Log Fixes',
     changes: [
       'Fixed AI Search using the previous query instead of the current search bar text',
@@ -23,6 +23,7 @@ const CHANGELOG_ENTRIES = [
       'Admin Panel audit tab now consolidates consecutive edits by the same user within 5 minutes',
       'Bulk delete and bulk move operations now create admin audit log entries',
       'Added Bulk Delete, Bulk Move, and Role Change filters to admin audit tab',
+      'Check-ins now record which staff member processed the return, visible in item detail history and the admin checkout history tab',
     ],
   },
   {
