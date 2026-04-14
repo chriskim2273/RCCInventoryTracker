@@ -9,8 +9,8 @@ const FALLBACK_MODELS = [
   'openrouter/free',
 ]
 
-// Items per chunk — keeps each prompt under ~25K chars
-const CHUNK_SIZE = 200
+// Items per chunk — ~60K chars per chunk, balances speed vs request count
+const CHUNK_SIZE = 400
 
 // Rate limiting — respect free-tier limits
 const CONCURRENT_LIMIT = 3
