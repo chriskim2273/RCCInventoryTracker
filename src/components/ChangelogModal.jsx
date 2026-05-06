@@ -3,11 +3,19 @@ import { Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import Modal from './Modal'
 
 // Update this version when adding new changelog entries
-const CHANGELOG_VERSION = '1.9.0'
+const CHANGELOG_VERSION = '1.9.1'
 const STORAGE_KEY = `changelog_dismissed_v${CHANGELOG_VERSION}`
 
 // Changelog entries - add new versions at the top
 const CHANGELOG_ENTRIES = [
+  {
+    version: '1.9.1',
+    date: '2026-05-06',
+    title: 'Eastern Time Display',
+    changes: [
+      'All timestamps now display in Eastern Time (America/New_York), automatically adjusting for daylight saving',
+    ],
+  },
   {
     version: '1.9.0',
     date: '2026-04-14',
