@@ -25,7 +25,7 @@ export function parseTimestamp(timestamp) {
 export function formatTimestamp(timestamp, options = {}) {
   const date = parseTimestamp(timestamp)
   if (!date) return '-'
-  return date.toLocaleString('en-US', options)
+  return date.toLocaleString('en-US', { timeZone: 'America/New_York', ...options })
 }
 
 /**
@@ -34,5 +34,5 @@ export function formatTimestamp(timestamp, options = {}) {
 export function formatDate(timestamp, options = {}) {
   const date = parseTimestamp(timestamp)
   if (!date) return 'Never'
-  return date.toLocaleDateString('en-US', options)
+  return date.toLocaleDateString('en-US', { timeZone: 'America/New_York', ...options })
 }
