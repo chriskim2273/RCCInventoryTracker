@@ -3,11 +3,21 @@ import { Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import Modal from './Modal'
 
 // Update this version when adding new changelog entries
-const CHANGELOG_VERSION = '1.9.1'
+const CHANGELOG_VERSION = '1.9.2'
 const STORAGE_KEY = `changelog_dismissed_v${CHANGELOG_VERSION}`
 
 // Changelog entries - add new versions at the top
 const CHANGELOG_ENTRIES = [
+  {
+    version: '1.9.2',
+    date: '2026-11-12',
+    title: 'Audit Trail Item Names',
+    changes: [
+      'Fixed items incorrectly appearing as "Unknown Item" in the audit trail',
+      'Deleted items now display their saved names in the audit trail when available',
+      'Thanks to Dan for bringing this to our attention!',
+    ],
+  },
   {
     version: '1.9.1',
     date: '2026-05-06',

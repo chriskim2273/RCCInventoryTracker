@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { fetchAuditItems, getAuditItemName } from '@/lib/auditUtils'
 import { formatTimestamp, formatDate } from '@/lib/utils'
 import { Users, Tag, History, Edit, Shield, Trash2, RotateCcw, Search, X, Package, MapPin, Plus, Mail, Key, UserX, CheckCircle, XCircle, ClipboardList, Settings, Bell, ChevronDown, Check, Lock, MessageSquare, ExternalLink } from 'lucide-react'
 import CategoryModal from '@/components/CategoryModal'
@@ -710,13 +711,9 @@ export default function AdminPanel() {
         // Apply pagination
         logsQuery = logsQuery.range(from, to)
 
-        // Fetch item logs, items, users, locations, and categories
-        const [logsResult, itemsResult, usersResult, locationsResult, categoriesResult] = await Promise.all([
+        // Fetch item logs and field lookups before resolving this page's items.
+        const [logsResult, usersResult, locationsResult, categoriesResult] = await Promise.all([
           logsQuery,
-          supabase
-            .from('items')
-            .select('id, name'),
-          // Note: We fetch ALL items (including deleted) so audit trail can show names for deleted items
           supabase
             .from('users')
             .select('id, email, first_name, last_name'),
@@ -728,11 +725,13 @@ export default function AdminPanel() {
             .select('id, name')
         ])
 
+        if (logsResult.error) throw logsResult.error
+        const itemsMap = await fetchAuditItems(supabase, logsResult.data || [])
+
         // Store total count for pagination
         setAuditTotalCount(logsResult.count || 0)
 
         // Manually join items and users to logs
-        const itemsMap = new Map((itemsResult.data || []).map(item => [item.id, item]))
         const usersMap = new Map((usersResult.data || []).map(user => [user.id, user]))
         const logsWithJoins = (logsResult.data || []).map(log => ({
           ...log,
@@ -2153,10 +2152,10 @@ export default function AdminPanel() {
                             </span>
                             {log.item ? (
                               <Link to={`/items/${log.item.id}`} className="font-semibold text-lg text-primary hover:underline">
-                                {log.item.name}
+                                {getAuditItemName(log)}
                               </Link>
                             ) : (
-                              <h3 className="font-semibold text-lg">Unknown Item</h3>
+                              <h3 className="font-semibold text-lg">{getAuditItemName(log)}</h3>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
